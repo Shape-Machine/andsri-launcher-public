@@ -1,0 +1,38 @@
+# Android and Gradle outputs
+.gradle/
+.kotlin/
+build/
+**/build/
+captures/
+.cxx/
+.externalNativeBuild/
+
+# Machine-local configuration
+local.properties
+.idea/
+*.iml
+out/
+
+# Signing material must never enter the public repository
+*.jks
+*.keystore
+keystore.properties
+.env
+.env.*
+!.env.example
+
+# Package outputs are ignored except curated public downloads
+*.apk
+*.aab
+*.ap_
+*.dex
+!releases/*.apk
+
+# Miscellaneous
+obj/
+*.so
+.DS_Store
+*.log
+*.tmp
+*.swp
+*~

@@ -1,0 +1,33 @@
+<resources>
+    <string name="app_name">andSri</string>
+    <string name="launcher_settings">लॉन्चर सेटिंग</string>
+    <string name="settings_title">andSri सेटिंग</string>
+    <string name="settings_summary">पसंदीदा ऐप, रूप और गोपनीयता नियंत्रण यहाँ हैं।</string>
+    <string name="app_info">ऐप की जानकारी</string>
+    <string name="hide">छिपाएँ</string>
+    <string name="add_favorite">पसंदीदा में जोड़ें</string>
+    <string name="remove_favorite">पसंदीदा से हटाएँ</string>
+    <string name="hide_title">%1$s को छिपाएँ?</string>
+    <string name="hide_message">यह लॉन्चर से गायब हो जाएगा और सेटिंग में छिपे ऐप से वापस लाया जा सकेगा।</string>
+    <string name="cancel">रद्द करें</string>
+    <string name="confirm_hide">ऐप छिपाएँ</string>
+    <string name="no_apps">कोई दिखाई देने वाला ऐप नहीं</string>
+    <string name="action_unavailable">कोई संगत ऐप उपलब्ध नहीं है।</string>
+    <string name="choose_home">लॉन्चर के रूप में उपयोग करने के लिए andSri को अपना होम ऐप बनाएँ।</string>
+    <string name="reset_launcher">लॉन्चर रीसेट करें</string>
+    <string name="reset_message">सभी andSri सेटिंग हटाकर डिफ़ॉल्ट पर लौटें?</string>
+    <string name="reset">रीसेट करें</string>
+    <string name="organize">व्यवस्थित करें</string><string name="edit_favorites">पसंदीदा संपादित करें</string><string name="reorder_favorites">पसंदीदा क्रम बदलें</string><string name="drag_reorder_hint">हैंडल से पंक्तियाँ खींचें।</string><string name="no_favorites">पहले कुछ पसंदीदा चुनें।</string>
+    <string name="rename">नाम बदलें</string><string name="hidden_apps">छिपे ऐप</string><string name="appearance">रूप</string>
+    <string name="choose_wallpaper">वॉलपेपर चुनें</string><string name="wallpaper_darkness">वॉलपेपर गहराई</string><string name="wallpaper_error">यह वॉलपेपर सुरक्षित नहीं रखा जा सका। दूसरी छवि चुनें।</string><string name="appearance_mode">हल्का और गहरा मोड</string><string name="display_mode">ऐप प्रदर्शन</string>
+    <string name="icon_theme">आइकन</string><string name="font_preset">टाइपोग्राफी</string><string name="clock_preset">घड़ी शैली</string><string name="list_density">सूची घनत्व</string>
+    <string name="pure_black">शुद्ध काली पृष्ठभूमि</string><string name="general">सामान्य</string><string name="language">भाषा</string>
+    <string name="default_home">डिफ़ॉल्ट होम ऐप</string><string name="open_source_licenses">ओपन-सोर्स लाइसेंस</string><string name="danger_zone">रीसेट</string><string name="save">सहेजें</string>
+    <string name="restore">वापस लाएँ</string><string name="restore_default">डिफ़ॉल्ट नाम</string><string name="authenticate_hidden">छिपे ऐप देखने के लिए प्रमाणित करें</string><string name="authentication_unavailable">छिपे ऐप खोलने से पहले स्क्रीन लॉक या बायोमेट्रिक पहचान सेट करें।</string>
+    <string name="restore_hidden">वापस लाने के ऐप चुनें</string><string name="no_hidden_apps">कोई छिपा ऐप नहीं</string>
+    <string name="option_system">सिस्टम के अनुसार</string><string name="option_light">हल्का</string><string name="option_dark">गहरा</string>
+    <string name="option_text">केवल पाठ</string><string name="option_icon_text">आइकन और पाठ</string>
+    <string name="option_normal">ऐप आइकन</string><string name="option_lawnicons">Lawnicons</string><string name="option_arcticons">Arcticons</string><string name="option_mondstern">Mondstern</string><string name="option_cuscon">Cuscon</string><string name="option_delta">Delta</string><string name="option_dollphone">Dollphone</string><string name="option_snow">Snow</string>
+    <string name="option_sans">Atkinson Hyperlegible Next</string><string name="option_serif">Newsreader</string><string name="option_monospace">Maple Mono</string>
+    <string name="option_compact">सघन</string><string name="option_standard">मानक</string><string name="option_comfortable">आरामदायक</string><string name="option_emphasized">प्रमुख</string>
+</resources>
