@@ -24,9 +24,47 @@
     <string name="no_favorites">Choose some favorites first.</string>
     <string name="rename">Rename</string>
     <string name="hidden_apps">Hidden apps</string>
+    <string name="weather">WEATHER</string>
+    <string name="weather_location">Location</string>
+    <string name="weather_location_hint">City or postal code</string>
+    <string name="find_location">Find</string>
+    <string name="finding_location">Finding location…</string>
+    <string name="choose_location">Choose location</string>
+    <string name="location_not_found">Location could not be found. Check your connection and try again.</string>
+    <string name="weather_style">Weather style</string>
+    <string name="temperature_unit">Temperature</string>
+    <string name="weather_provider">Weather provider</string>
+    <string name="option_open_meteo">Open-Meteo</string>
+    <string name="clear_weather">Hide weather and clear location</string>
+    <string name="weather_attribution">Weather data by Open-Meteo.com</string>
+    <string name="weather_attribution_checked">Open-Meteo · checked %1$s</string>
+    <string name="weather_tap_to_check">Tap to check weather</string>
+    <string name="weather_refreshing">Checking weather…</string>
+    <string name="weather_refresh_failed">Could not refresh · tap to retry</string>
+    <string name="weather_updated_just_now">just now</string>
+    <plurals name="weather_updated_minutes"><item quantity="one">%d minute ago</item><item quantity="other">%d minutes ago</item></plurals>
+    <plurals name="weather_updated_hours"><item quantity="one">%d hour ago</item><item quantity="other">%d hours ago</item></plurals>
+    <plurals name="weather_updated_days"><item quantity="one">%d day ago</item><item quantity="other">%d days ago</item></plurals>
+    <string name="show_apps">Show all apps</string>
+    <string name="hide_apps">Hide all apps</string>
+    <string name="option_celsius">Celsius</string>
+    <string name="option_fahrenheit">Fahrenheit</string>
+    <string name="weather_clear">Clear</string>
+    <string name="weather_partly_cloudy">Partly cloudy</string>
+    <string name="weather_cloudy">Cloudy</string>
+    <string name="weather_fog">Fog</string>
+    <string name="weather_drizzle">Drizzle</string>
+    <string name="weather_rain">Rain</string>
+    <string name="weather_snow">Snow</string>
+    <string name="weather_thunderstorm">Thunderstorm</string>
+    <string name="weather_unknown">Unknown conditions</string>
     <string name="appearance">APPEARANCE</string>
+    <string name="background">BACKGROUND</string>
+    <string name="home_screen">HOME SCREEN</string>
+    <string name="app_list">APP LIST</string>
+    <string name="typography_section">TYPOGRAPHY</string>
     <string name="choose_wallpaper">Choose wallpaper</string>
-    <string name="wallpaper_darkness">Wallpaper darkness</string>
+    <string name="wallpaper_fade">Wallpaper fade</string>
     <string name="wallpaper_error">This wallpaper could not be retained. Choose another image.</string>
     <string name="appearance_mode">Light and dark mode</string>
     <string name="display_mode">App display</string>
@@ -34,7 +72,7 @@
     <string name="font_preset">Typography</string>
     <string name="clock_preset">Clock style</string>
     <string name="list_density">List density</string>
-    <string name="pure_black">Pure black background</string>
+    <string name="solid_background">Solid background</string>
     <string name="general">GENERAL</string>
     <string name="language">Language</string>
     <string name="default_home">Default Home app</string>
@@ -55,7 +93,7 @@
     <string name="option_normal">Application icons</string>
     <string name="option_lawnicons">Lawnicons</string>
     <string name="option_arcticons">Arcticons</string>
-    <string name="option_mondstern">Mondstern</string>
+    <string name="option_appstract">Appstract</string>
     <string name="option_cuscon">Cuscon</string>
     <string name="option_delta">Delta</string>
     <string name="option_dollphone">Dollphone</string>

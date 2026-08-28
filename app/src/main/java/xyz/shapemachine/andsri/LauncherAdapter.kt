@@ -23,6 +23,9 @@ class LauncherAdapter(
     private val onAppClick: (AppEntry) -> Unit,
     private val onAppLongClick: (View, AppEntry) -> Unit,
     private val onSettingsClick: () -> Unit,
+    private val onWeatherRefresh: () -> Unit,
+    private val onWeatherAttribution: () -> Unit,
+    private val onAppsToggle: (Boolean) -> Unit,
 ) : BaseAdapter() {
     private data class CachedIcon(val state: Drawable.ConstantState, val estimatedBytes: Int)
 
@@ -31,8 +34,13 @@ class LauncherAdapter(
     private var timeText = ""
     private var dateText = ""
     private var textColor = Color.WHITE
+    private var weatherConfig = WeatherConfig()
+    private var weatherSnapshot: WeatherSnapshot? = null
+    private var weatherRefreshing = false
+    private var weatherError: String? = null
     private var boundTimeView: TextView? = null
     private var boundDateView: TextView? = null
+    private var boundWeatherView: LinearLayout? = null
     private val iconProvider = BundledIconProvider(context)
     private val normalIconCache = object : LruCache<String, CachedIcon>(4 * 1024 * 1024) {
         override fun sizeOf(key: String, value: CachedIcon) = value.estimatedBytes
@@ -42,23 +50,32 @@ class LauncherAdapter(
     override fun getCount() = rows.size
     override fun getItem(position: Int) = rows[position]
     override fun getItemId(position: Int) = position.toLong()
-    override fun getViewTypeCount() = 5
+    override fun getViewTypeCount() = 7
     override fun getItemViewType(position: Int) = when (rows[position]) {
         HomeRow.Header -> 0
         is HomeRow.App -> 1
         is HomeRow.Favorites -> 2
-        HomeRow.Spacer -> 3
-        HomeRow.Empty -> 4
+        HomeRow.Empty -> 3
+        HomeRow.Weather -> 4
+        is HomeRow.AppsToggle -> 5
+        HomeRow.Gap -> 6
     }
 
-    fun submit(updatedRows: List<HomeRow>, updatedAppearance: AppearanceConfig, updatedTextColor: Int) {
+    fun submit(updatedRows: List<HomeRow>, updatedAppearance: AppearanceConfig, updatedWeather: WeatherConfig, updatedTextColor: Int) {
         rows = updatedRows
         appearance = updatedAppearance
+        weatherConfig = updatedWeather
         textColor = updatedTextColor
+        if (updatedWeather.location == null) {
+            weatherSnapshot = null
+            weatherError = null
+            boundWeatherView = null
+        }
         notifyDataSetChanged()
     }
 
-    fun updateAppearance(updatedAppearance: AppearanceConfig, updatedTextColor: Int) {
+    fun updateAppearance(updatedAppearance: AppearanceConfig, updatedWeather: WeatherConfig, updatedTextColor: Int) {
+        val weatherPresetChanged = updatedWeather.preset != weatherConfig.preset
         val requiresRebind = updatedTextColor != textColor ||
             updatedAppearance.displayMode != appearance.displayMode ||
             updatedAppearance.font != appearance.font ||
@@ -66,8 +83,17 @@ class LauncherAdapter(
             updatedAppearance.iconTheme != appearance.iconTheme ||
             updatedAppearance.clockPreset != appearance.clockPreset
         appearance = updatedAppearance
+        weatherConfig = updatedWeather
         textColor = updatedTextColor
         if (requiresRebind) notifyDataSetChanged()
+        else if (weatherPresetChanged) boundWeatherView?.let(::bindWeather)
+    }
+
+    fun updateWeather(snapshot: WeatherSnapshot?, refreshing: Boolean, error: String? = null) {
+        weatherSnapshot = snapshot
+        weatherRefreshing = refreshing
+        weatherError = error
+        boundWeatherView?.let(::bindWeather)
     }
 
     fun updateClock(time: String, date: String) {
@@ -84,10 +110,149 @@ class LauncherAdapter(
 
     override fun getView(position: Int, recycled: View?, parent: ViewGroup): View = when (val row = rows[position]) {
         HomeRow.Header -> headerView(recycled)
+        HomeRow.Weather -> weatherView(recycled)
         is HomeRow.App -> appView(row, recycled)
         is HomeRow.Favorites -> favoritesView(row.apps, recycled)
-        HomeRow.Spacer -> spacerView(recycled)
+        is HomeRow.AppsToggle -> appsToggleView(row.expanded, recycled)
+        HomeRow.Gap -> gapView(recycled)
         HomeRow.Empty -> emptyView(recycled)
+    }
+
+    private fun weatherView(recycled: View?): View {
+        val container = recycled as? LinearLayout ?: LinearLayout(context).apply {
+            layoutParams = AbsListView.LayoutParams(-1, -2)
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            isClickable = true
+            isFocusable = true
+            isHapticFeedbackEnabled = true
+            addView(label(28f).apply { id = WEATHER_PRIMARY_ID; gravity = Gravity.CENTER })
+            addView(LinearLayout(context).apply {
+                gravity = Gravity.CENTER
+                orientation = LinearLayout.HORIZONTAL
+                addView(label(15f).apply { id = WEATHER_SECONDARY_ID; gravity = Gravity.CENTER })
+                addView(label(18f).apply {
+                    id = WEATHER_ATTRIBUTION_ID
+                    gravity = Gravity.CENTER
+                    text = "ⓘ"
+                    contentDescription = context.getString(R.string.weather_attribution)
+                    minWidth = dp(44)
+                    minHeight = dp(44)
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener { onWeatherAttribution() }
+                })
+            })
+            setOnClickListener { view ->
+                if (!weatherRefreshing) {
+                    view.performHapticFeedback(0)
+                    onWeatherRefresh()
+                }
+            }
+        }
+        boundWeatherView = container
+        bindWeather(container)
+        return container
+    }
+
+    private fun bindWeather(container: LinearLayout) {
+        val primary = container.findViewById<TextView>(WEATHER_PRIMARY_ID)
+        val secondary = container.findViewById<TextView>(WEATHER_SECONDARY_ID)
+        val attribution = container.findViewById<TextView>(WEATHER_ATTRIBUTION_ID)
+        val snapshot = weatherSnapshot
+        val condition = snapshot?.let { context.getString(weatherConditionLabel(it.weatherCode)) }
+        val age = snapshot?.let(::weatherAge)
+        val temperature = snapshot?.let {
+            val suffix = if (OpenMeteoClient.resolveUnit(it.unit) == TemperatureUnit.FAHRENHEIT) "°F" else "°C"
+            "${OpenMeteoClient.roundedTemperature(it)}$suffix"
+        }
+        val symbol = snapshot?.let { weatherSymbol(it.weatherCode) }
+        when (weatherConfig.preset) {
+            WeatherPreset.COMPACT -> {
+                primary.textSize = 19f
+                primary.text = if (snapshot == null) context.getString(R.string.weather_tap_to_check) else "$symbol  $temperature · $condition · $age"
+                secondary.visibility = View.GONE
+                attribution.visibility = View.GONE
+                container.setPadding(dp(24), dp(4), dp(24), dp(10))
+            }
+            WeatherPreset.STANDARD -> {
+                primary.textSize = 28f
+                primary.text = temperature?.let { "$symbol  $it" } ?: context.getString(R.string.weather_tap_to_check)
+                secondary.visibility = View.VISIBLE
+                attribution.visibility = View.VISIBLE
+                secondary.text = snapshot?.let { "${it.locationName} · $condition · $age" }.orEmpty()
+                container.setPadding(dp(24), dp(8), dp(24), dp(14))
+            }
+            WeatherPreset.EMPHASIZED -> {
+                primary.textSize = 40f
+                primary.text = temperature?.let { "$symbol  $it" } ?: context.getString(R.string.weather_tap_to_check)
+                secondary.visibility = View.VISIBLE
+                attribution.visibility = View.VISIBLE
+                secondary.text = snapshot?.let { "${it.locationName} · $condition · $age" }.orEmpty()
+                container.setPadding(dp(24), dp(12), dp(24), dp(18))
+            }
+        }
+        if (weatherRefreshing) {
+            if (weatherConfig.preset == WeatherPreset.COMPACT) primary.text = context.getString(R.string.weather_refreshing)
+            else secondary.apply { visibility = View.VISIBLE; text = context.getString(R.string.weather_refreshing) }
+        } else weatherError?.let {
+            if (weatherConfig.preset == WeatherPreset.COMPACT) primary.text = it
+            else secondary.apply { visibility = View.VISIBLE; text = it }
+        }
+        listOf(primary, secondary, attribution).forEach { it.setTextColor(textColor); it.typeface = font() }
+        attribution.alpha = 0.7f
+        container.contentDescription = listOfNotNull(primary.text, secondary.text.takeIf { secondary.visibility == View.VISIBLE }).joinToString(". ")
+    }
+
+    private fun appsToggleView(expanded: Boolean, recycled: View?): View = (recycled as? TextView ?: label(22f)).apply {
+        text = if (expanded) "⌃" else "⌄"
+        contentDescription = context.getString(if (expanded) R.string.hide_apps else R.string.show_apps)
+        gravity = Gravity.CENTER
+        setTextColor(textColor)
+        typeface = font()
+        setPadding(dp(24), dp(16), dp(24), dp(16))
+        isHapticFeedbackEnabled = true
+        setOnClickListener { view -> view.performHapticFeedback(0); onAppsToggle(!expanded) }
+    }
+
+    private fun gapView(recycled: View?): View = (recycled ?: View(context)).apply {
+        layoutParams = AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(SECTION_GAP_DP))
+        setBackgroundColor(Color.TRANSPARENT)
+        isClickable = false
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+    }
+
+    private fun weatherConditionLabel(code: Int) = when (code) {
+        0 -> R.string.weather_clear
+        1, 2 -> R.string.weather_partly_cloudy
+        3 -> R.string.weather_cloudy
+        45, 48 -> R.string.weather_fog
+        51, 53, 55, 56, 57 -> R.string.weather_drizzle
+        61, 63, 65, 66, 67, 80, 81, 82 -> R.string.weather_rain
+        71, 73, 75, 77, 85, 86 -> R.string.weather_snow
+        95, 96, 99 -> R.string.weather_thunderstorm
+        else -> R.string.weather_unknown
+    }
+
+    private fun weatherSymbol(code: Int) = when (code) {
+        0 -> "☀"
+        1, 2 -> "⛅"
+        3 -> "☁"
+        45, 48 -> "≋"
+        51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82 -> "☂"
+        71, 73, 75, 77, 85, 86 -> "❄"
+        95, 96, 99 -> "ϟ"
+        else -> "·"
+    }
+
+    private fun weatherAge(snapshot: WeatherSnapshot): String {
+        val minutes = ((System.currentTimeMillis() - snapshot.fetchedAtMillis).coerceAtLeast(0L) / 60_000L).toInt()
+        return when {
+            minutes < 1 -> context.getString(R.string.weather_updated_just_now)
+            minutes < 60 -> context.resources.getQuantityString(R.plurals.weather_updated_minutes, minutes, minutes)
+            minutes < 24 * 60 -> (minutes / 60).let { context.resources.getQuantityString(R.plurals.weather_updated_hours, it, it) }
+            else -> (minutes / (24 * 60)).let { context.resources.getQuantityString(R.plurals.weather_updated_days, it, it) }
+        }
     }
 
     private fun headerView(recycled: View?): View {
@@ -95,7 +260,7 @@ class LauncherAdapter(
             layoutParams = AbsListView.LayoutParams(-1, -2)
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            setPadding(dp(24), dp(56), dp(24), dp(40))
+            setPadding(dp(24), dp(56), dp(24), 0)
             addView(LinearLayout(context).apply {
                 gravity = Gravity.CENTER_VERTICAL
                 orientation = LinearLayout.HORIZONTAL
@@ -179,13 +344,6 @@ class LauncherAdapter(
         setPadding(dp(28), dp(32), dp(28), dp(32))
     }
 
-    private fun spacerView(recycled: View?): View = (recycled ?: View(context)).apply {
-        layoutParams = AbsListView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(34))
-        setBackgroundColor(Color.TRANSPARENT)
-        isClickable = false
-        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-    }
-
     private fun label(size: Float) = TextView(context).apply { setTextColor(textColor); textSize = size }
     private fun font() = fontCache.getOrPut(appearance.font) {
         when (appearance.font) {
@@ -219,6 +377,10 @@ class LauncherAdapter(
         private const val TIME_ID = 1001
         private const val DATE_ID = 1002
         private const val SETTINGS_ID = 1003
+        private const val WEATHER_PRIMARY_ID = 1004
+        private const val WEATHER_SECONDARY_ID = 1005
+        private const val WEATHER_ATTRIBUTION_ID = 1006
+        private const val SECTION_GAP_DP = 24
     }
 
     private class AdaptiveFavoritesGrid(context: Context) : GridLayout(context) {

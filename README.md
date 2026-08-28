@@ -1,10 +1,10 @@
 # andSri
 
-andSri is a minimal Android 16+ launcher designed for low battery use, low CPU overhead, and a quiet home screen. It provides one scrolling screen with the date and time, a configurable favorites grid, and all visible apps alphabetically.
+andSri is a minimal Android 16+ launcher designed for low battery use, low CPU overhead, and a quiet home screen. One scrolling screen combines time, optional tap-to-refresh weather, favorites, and every visible app.
 
 ## Download
 
-The signed APK is available at [releases/andSri-0.3.0.apk](releases/andSri-0.3.0.apk). Verify it against [releases/SHA256SUMS](releases/SHA256SUMS) before installation.
+The current signed APK is [andSri 0.4.0](releases/andSri-0.4.0.apk). Verify it against [SHA256SUMS](releases/SHA256SUMS) before installation.
 
 Android may require permission to install applications from your browser or file manager. Existing andSri installations signed with the official release certificate can be upgraded without losing launcher configuration.
 
@@ -16,12 +16,13 @@ Official signing certificate SHA-256:
 
 ## Highlights
 
-- No internet permission, telemetry, analytics, background service, worker, or polling
+- No telemetry, analytics, background service, worker, alarm, wake lock, or polling
+- Optional cached weather with manual location and tap-only networking
 - Favorites in a responsive icon grid, followed by every visible app alphabetically
 - Text-only and icon-with-text app rows
-- Bundled Lawnicons, Arcticons, Mondstern, Cuscon, Delta, Dollphone, and Snow subsets
+- Bundled Lawnicons, Arcticons, Appstract, Cuscon, Delta, Dollphone, and Snow subsets
 - Bundled Atkinson Hyperlegible Next, Newsreader, and Maple Mono typography
-- Gallery or system wallpaper, automatic contrast, dark mode, and pure-black background
+- Gallery or system wallpaper, light/dark modes, static fade, and adaptive solid background
 - Favorite ordering, custom app labels, and biometric-protected hidden apps
 - English, Dutch, and Hindi localization
 - Android-managed backup for lightweight launcher configuration

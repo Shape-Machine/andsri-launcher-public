@@ -32,6 +32,7 @@ import android.widget.ListView
 import android.widget.PopupMenu
 import android.widget.Toast
 import java.text.DateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.concurrent.Executors
 
@@ -42,23 +43,45 @@ class MainActivity : Activity() {
     private lateinit var listView: ListView
     private lateinit var root: FrameLayout
     private lateinit var customWallpaper: ImageView
+    private lateinit var weatherCache: WeatherCache
+    private val weatherClient = OpenMeteoClient()
+    private val weatherRequestGate = RequestGate()
     private val loader = Executors.newSingleThreadExecutor()
     private val reloadLock = Any()
     private var reloadRunning = false
     private var refreshDirty = true
     private var packagesDirty = true
     private var rowsDirty = true
+    private var favoritePreloadDirty = true
     private var cachedAllApps: List<AppEntry> = emptyList()
     private var cachedVisibleApps: List<AppEntry> = emptyList()
     @Volatile private var isActive = false
     private var systemBarTextColor = Color.WHITE
+    private var appliedAppearance: AppearanceConfig? = null
+    private var appliedTextColor: Int? = null
     @Volatile private var displayedWallpaper: String? = null
+    private lateinit var timeFormatter: DateFormat
+    private lateinit var dateFormatter: DateFormat
+    private val clockCalendar = Calendar.getInstance()
+    private var displayedDay = Int.MIN_VALUE
+    private var displayedDate = ""
     private val handler = Handler(Looper.getMainLooper())
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key == null || key == LauncherPreferences.KEY_WEATHER_NAME ||
+            key == LauncherPreferences.KEY_WEATHER_LATITUDE || key == LauncherPreferences.KEY_WEATHER_LONGITUDE ||
+            key == LauncherPreferences.KEY_WEATHER_UNIT
+        ) {
+            weatherRequestGate.invalidate()
+            weatherClient.cancel()
+        }
         requestReload(
             packagesChanged = key == null || key == LauncherPreferences.KEY_LABELS,
             rowsChanged = key == null || key == LauncherPreferences.KEY_LABELS ||
-                key == LauncherPreferences.KEY_FAVORITES || key == LauncherPreferences.KEY_HIDDEN,
+                key == LauncherPreferences.KEY_FAVORITES || key == LauncherPreferences.KEY_HIDDEN ||
+                key == LauncherPreferences.KEY_WEATHER_NAME || key == LauncherPreferences.KEY_WEATHER_LATITUDE ||
+                key == LauncherPreferences.KEY_WEATHER_LONGITUDE || key == LauncherPreferences.KEY_APPS_EXPANDED,
+            preloadFavorites = key == null || key == LauncherPreferences.KEY_FAVORITES ||
+                key == LauncherPreferences.KEY_LABELS || key == LauncherPreferences.KEY_THEME,
         )
     }
     private val clockTick = object : Runnable {
@@ -79,6 +102,7 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         configureWindow()
         preferences = LauncherPreferences(this)
+        weatherCache = WeatherCache(this)
         appRepository = AppRepository(this)
         adapter = LauncherAdapter(
             context = this,
@@ -87,6 +111,11 @@ class MainActivity : Activity() {
             onAppClick = ::launchApp,
             onAppLongClick = ::showAppMenu,
             onSettingsClick = { startActivity(Intent(this, SettingsActivity::class.java)) },
+            onWeatherRefresh = ::refreshWeather,
+            onWeatherAttribution = {
+                startActivityIfResolvable(Intent(Intent.ACTION_VIEW, Uri.parse("https://open-meteo.com/")))
+            },
+            onAppsToggle = preferences::setAppsExpanded,
         )
         listView = ListView(this).apply {
             id = LIST_ID
@@ -114,6 +143,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         isActive = true
+        refreshClockFormatters()
         startReloadIfNeeded()
         clockTick.run()
     }
@@ -128,6 +158,8 @@ class MainActivity : Activity() {
         preferences.unregisterChangeListener(preferenceListener)
         getSystemService(LauncherApps::class.java).unregisterCallback(launcherCallback)
         loader.shutdownNow()
+        weatherRequestGate.invalidate()
+        weatherClient.cancel()
         super.onDestroy()
     }
 
@@ -169,17 +201,19 @@ class MainActivity : Activity() {
             if (!isActive || reloadRunning || !refreshDirty) return
             reloadRunning = true
             refreshDirty = false
-            ReloadWork(packagesDirty, rowsDirty).also {
+            ReloadWork(packagesDirty, rowsDirty, favoritePreloadDirty).also {
                 packagesDirty = false
                 rowsDirty = false
+                favoritePreloadDirty = false
             }
         }
         loader.execute {
             val result = runCatching { prepareReload(work) }
             mainExecutor.execute {
                 result.getOrNull()?.takeUnless { isDestroyed }?.let { update ->
-                    if (update.rows == null) adapter.updateAppearance(update.appearance, update.textColor)
-                    else adapter.submit(update.rows, update.appearance, update.textColor)
+                    if (update.rows == null) adapter.updateAppearance(update.appearance, update.weather, update.textColor)
+                    else adapter.submit(update.rows, update.appearance, update.weather, update.textColor)
+                    adapter.updateWeather(update.weatherSnapshot, weatherRequestGate.isActive())
                     applyAppearance(update.appearance, update.textColor, update.wallpaper)
                 }
                 val rerun = synchronized(reloadLock) {
@@ -203,38 +237,77 @@ class MainActivity : Activity() {
         val rebuildRows = work.rebuildRows || work.scanPackages
         val rows = if (rebuildRows) {
             cachedVisibleApps = cachedAllApps.filterNot { it.component.flattenToString() in state.hidden }
-            HomeRows.build(cachedVisibleApps, state.favorites)
+            HomeRows.build(
+                cachedVisibleApps,
+                state.favorites,
+                weatherConfigured = state.weather.location != null,
+                appsExpanded = state.appsExpanded,
+            )
         } else null
         val textColor = AppearanceResolver.textColor(this, state.appearance)
-        val favoriteLookup = cachedVisibleApps.associateBy { it.component.flattenToString() }
-        val favoriteApps = state.favorites.mapNotNull(favoriteLookup::get)
-        adapter.preloadFavoriteIcons(favoriteApps, state.appearance, textColor)
+        if (work.preloadFavorites) {
+            val favoriteLookup = cachedVisibleApps.associateBy { it.component.flattenToString() }
+            val favoriteApps = state.favorites.mapNotNull(favoriteLookup::get)
+            adapter.preloadFavoriteIcons(favoriteApps, state.appearance, textColor)
+        }
         return ReloadUpdate(
             rows,
             state.appearance,
+            state.weather,
+            weatherCache.load(state.weather),
             textColor,
             loadWallpaperUpdate(state.appearance),
         )
     }
 
-    private fun requestReload(packagesChanged: Boolean = false, rowsChanged: Boolean = false) {
+    private fun refreshWeather() {
+        val config = preferences.weather()
+        val location = config.location ?: return
+        val requestToken = weatherRequestGate.tryBegin() ?: return
+        adapter.updateWeather(weatherCache.load(config), refreshing = true)
+        Thread({
+            val result = runCatching { weatherClient.fetch(config) }
+            mainExecutor.execute {
+                if (isDestroyed || !weatherRequestGate.finish(requestToken) || preferences.weather() != config) return@execute
+                result.getOrNull()?.let { weatherCache.save(location, it) }
+                val snapshot = result.getOrNull() ?: weatherCache.load(config)
+                adapter.updateWeather(
+                    snapshot,
+                    refreshing = false,
+                    error = result.exceptionOrNull()?.let { getString(R.string.weather_refresh_failed) },
+                )
+            }
+        }, "andSri-weather-refresh").start()
+    }
+
+    private fun requestReload(
+        packagesChanged: Boolean = false,
+        rowsChanged: Boolean = false,
+        preloadFavorites: Boolean = packagesChanged,
+    ) {
         synchronized(reloadLock) {
             refreshDirty = true
             packagesDirty = packagesDirty || packagesChanged
             rowsDirty = rowsDirty || rowsChanged
+            favoritePreloadDirty = favoritePreloadDirty || preloadFavorites
         }
         if (isActive) startReloadIfNeeded()
     }
 
     private fun applyAppearance(config: AppearanceConfig, textColor: Int, wallpaperUpdate: WallpaperUpdate?) {
-        val usesSystemWallpaper = !config.pureBlack && config.wallpaperUri == null
+        if (config == appliedAppearance && textColor == appliedTextColor && wallpaperUpdate == null) return
+        appliedAppearance = config
+        appliedTextColor = textColor
+        val backgroundColor = AppearanceResolver.backgroundColor(this, config)
+        val showsWallpaper = !config.solidBackground && config.wallpaperFade < 255
+        val usesSystemWallpaper = showsWallpaper && config.wallpaperUri == null
         if (usesSystemWallpaper) window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
         else window.clearFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
         systemBarTextColor = textColor
         root.findViewById<View>(STATUS_BAR_ID).setBackgroundColor(systemBarBackground())
         window.decorView.requestApplyInsets()
-        root.setBackgroundColor(if (config.pureBlack) Color.BLACK else Color.TRANSPARENT)
-        customWallpaper.visibility = if (config.pureBlack || config.wallpaperUri == null) View.GONE else View.VISIBLE
+        root.setBackgroundColor(if (showsWallpaper) Color.TRANSPARENT else backgroundColor)
+        customWallpaper.visibility = if (!showsWallpaper || config.wallpaperUri == null) View.GONE else View.VISIBLE
         if (customWallpaper.visibility == View.GONE && displayedWallpaper != null) {
             customWallpaper.setImageDrawable(null)
             displayedWallpaper = null
@@ -247,23 +320,28 @@ class MainActivity : Activity() {
                 customWallpaper.setImageDrawable(null)
                 displayedWallpaper = null
                 customWallpaper.visibility = View.GONE
-                root.setBackgroundColor(Color.BLACK)
+                root.setBackgroundColor(backgroundColor)
             }
         }
         val overlay = root.findViewById<View>(OVERLAY_ID)
         when {
-            config.pureBlack -> {
+            !showsWallpaper -> {
                 overlay.visibility = View.GONE
                 customWallpaper.clearColorFilter()
             }
             customWallpaper.visibility == View.VISIBLE -> {
                 overlay.visibility = View.GONE
-                customWallpaper.colorFilter = BlendModeColorFilter(Color.argb(config.darkness, 0, 0, 0), BlendMode.SRC_OVER)
+                customWallpaper.colorFilter = BlendModeColorFilter(
+                    Color.argb(config.wallpaperFade, Color.red(backgroundColor), Color.green(backgroundColor), Color.blue(backgroundColor)),
+                    BlendMode.SRC_OVER,
+                )
             }
             config.wallpaperUri == null -> {
                 customWallpaper.clearColorFilter()
                 overlay.visibility = View.VISIBLE
-                overlay.setBackgroundColor(Color.argb(config.darkness, 0, 0, 0))
+                overlay.setBackgroundColor(
+                    Color.argb(config.wallpaperFade, Color.red(backgroundColor), Color.green(backgroundColor), Color.blue(backgroundColor)),
+                )
             }
             else -> {
                 customWallpaper.clearColorFilter()
@@ -272,11 +350,11 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun systemBarBackground() = if (systemBarTextColor == Color.BLACK) Color.rgb(246, 246, 246) else Color.BLACK
+    private fun systemBarBackground() = if (systemBarTextColor == Color.BLACK) Color.WHITE else Color.BLACK
 
     private fun loadWallpaperUpdate(config: AppearanceConfig): WallpaperUpdate? {
         val uri = config.wallpaperUri ?: return null
-        if (config.pureBlack || uri == displayedWallpaper) return null
+        if (config.solidBackground || config.wallpaperFade >= 255 || uri == displayedWallpaper) return null
         val bitmap = runCatching {
             val width = resources.displayMetrics.widthPixels
             val height = resources.displayMetrics.heightPixels
@@ -304,10 +382,23 @@ class MainActivity : Activity() {
 
     private fun updateClock() {
         val now = Date()
+        clockCalendar.time = now
+        val day = clockCalendar.get(Calendar.YEAR) * 400 + clockCalendar.get(Calendar.DAY_OF_YEAR)
+        if (day != displayedDay) {
+            displayedDay = day
+            displayedDate = dateFormatter.format(now)
+        }
         adapter.updateClock(
-            DateFormat.getTimeInstance(DateFormat.SHORT).format(now),
-            DateFormat.getDateInstance(DateFormat.FULL).format(now),
+            timeFormatter.format(now),
+            displayedDate,
         )
+    }
+
+    private fun refreshClockFormatters() {
+        timeFormatter = DateFormat.getTimeInstance(DateFormat.SHORT)
+        dateFormatter = DateFormat.getDateInstance(DateFormat.FULL)
+        clockCalendar.timeZone = timeFormatter.timeZone
+        displayedDay = Int.MIN_VALUE
     }
 
     private fun scheduleNextMinute() {
@@ -399,8 +490,14 @@ class MainActivity : Activity() {
     private data class ReloadUpdate(
         val rows: List<HomeRow>?,
         val appearance: AppearanceConfig,
+        val weather: WeatherConfig,
+        val weatherSnapshot: WeatherSnapshot?,
         val textColor: Int,
         val wallpaper: WallpaperUpdate?,
     )
-    private data class ReloadWork(val scanPackages: Boolean, val rebuildRows: Boolean)
+    private data class ReloadWork(
+        val scanPackages: Boolean,
+        val rebuildRows: Boolean,
+        val preloadFavorites: Boolean,
+    )
 }

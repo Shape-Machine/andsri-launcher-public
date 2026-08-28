@@ -19,7 +19,9 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsetsController
 import android.widget.BaseAdapter
+import android.widget.EditText
 import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -43,6 +45,9 @@ class SettingsActivity : Activity() {
     private var pendingAppsAction: (() -> Unit)? = null
     private var hiddenPromptCancellation: android.os.CancellationSignal? = null
     private var hiddenDialog: AlertDialog? = null
+    private val weatherClient = OpenMeteoClient()
+    private val locationRequestGate = RequestGate()
+    private val weatherCache by lazy { WeatherCache(this) }
     private val appearance by lazy { preferences.appearance() }
     private val settingsTypeface: Typeface by lazy {
         resources.getFont(when (appearance.font) {
@@ -52,23 +57,28 @@ class SettingsActivity : Activity() {
         })
     }
     private val foregroundColor by lazy {
-        val appearance = preferences.appearance()
-        val systemDark = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK ==
-            android.content.res.Configuration.UI_MODE_NIGHT_YES
-        when {
-            appearance.pureBlack -> Color.WHITE
-            appearance.appearanceMode == AppearanceMode.LIGHT -> Color.BLACK
-            appearance.appearanceMode == AppearanceMode.DARK || systemDark -> Color.WHITE
-            else -> Color.BLACK
-        }
+        AppearanceResolver.textColor(this, preferences.appearance())
     }
     private val backgroundColor get() = if (foregroundColor == Color.WHITE) Color.rgb(18, 18, 18) else Color.rgb(246, 246, 246)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         preferences = LauncherPreferences(this)
+        configureSystemBarIcons()
         repository = AppRepository(this)
         render()
+    }
+
+    private fun configureSystemBarIcons() {
+        val lightFlags = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
+            WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
+        window.decorView.setOnApplyWindowInsetsListener { _, insets ->
+            window.insetsController?.setSystemBarsAppearance(
+                if (AppearanceResolver.isDark(this, preferences.appearance())) 0 else lightFlags,
+                lightFlags,
+            )
+            insets
+        }
     }
 
     private fun render() {
@@ -91,27 +101,41 @@ class SettingsActivity : Activity() {
             action(R.string.edit_favorites, ::editFavorites)
             action(R.string.reorder_favorites, ::reorderFavorites)
             action(R.string.hidden_apps, ::authenticateHiddenApps)
-            section(R.string.appearance)
-            action(R.string.choose_wallpaper, ::chooseWallpaper)
-            darknessControl()
-            switchControl(R.string.pure_black, appearance.pureBlack) {
-                preferences.saveAppearance(preferences.appearance().copy(pureBlack = it)); recreate()
+            section(R.string.weather)
+            action(R.string.weather_location, ::editWeatherLocation, preferences.weather().location?.name)
+            enumControl(R.string.weather_style, WeatherPreset.entries, preferences.weather().preset) {
+                preferences.saveWeather(preferences.weather().copy(preset = it))
             }
+            enumControl(R.string.temperature_unit, TemperatureUnit.entries, preferences.weather().unit) {
+                weatherCache.clear()
+                preferences.saveWeather(preferences.weather().copy(unit = it))
+            }
+            action(R.string.weather_provider, ::openWeatherProvider, getString(R.string.option_open_meteo))
+            if (preferences.weather().location != null) action(R.string.clear_weather, ::clearWeather)
+            section(R.string.background)
             enumControl(R.string.appearance_mode, AppearanceMode.entries, appearance.appearanceMode) {
                 preferences.saveAppearance(preferences.appearance().copy(appearanceMode = it)); recreate()
             }
-            enumControl(R.string.display_mode, AppDisplayMode.entries, appearance.displayMode) {
-                preferences.saveAppearance(preferences.appearance().copy(displayMode = it))
+            action(R.string.choose_wallpaper, ::chooseWallpaper)
+            fadeControl()
+            switchControl(R.string.solid_background, appearance.solidBackground) {
+                preferences.saveAppearance(preferences.appearance().copy(solidBackground = it))
             }
-            iconThemeControl()
-            enumControl(R.string.font_preset, FontPreset.entries, appearance.font, vertical = true) {
-                preferences.saveAppearance(preferences.appearance().copy(font = it)); recreate()
-            }
+            section(R.string.home_screen)
             enumControl(R.string.clock_preset, ClockPreset.entries, appearance.clockPreset) {
                 preferences.saveAppearance(preferences.appearance().copy(clockPreset = it))
             }
             enumControl(R.string.list_density, DensityPreset.entries, appearance.density) {
                 preferences.saveAppearance(preferences.appearance().copy(density = it)); recreate()
+            }
+            section(R.string.app_list)
+            enumControl(R.string.display_mode, AppDisplayMode.entries, appearance.displayMode) {
+                preferences.saveAppearance(preferences.appearance().copy(displayMode = it))
+            }
+            iconThemeControl()
+            section(R.string.typography_section)
+            enumControl(R.string.font_preset, FontPreset.entries, appearance.font, vertical = true) {
+                preferences.saveAppearance(preferences.appearance().copy(font = it)); recreate()
             }
             section(R.string.general)
             action(R.string.language, ::setLanguage)
@@ -222,16 +246,19 @@ class SettingsActivity : Activity() {
         }
     }
 
-    private fun LinearLayout.darknessControl() {
-        addView(title(getString(R.string.wallpaper_darkness), 16f).apply { setPadding(dp(4), dp(14), dp(4), 0) })
+    private fun LinearLayout.fadeControl() {
+        addView(title(getString(R.string.wallpaper_fade), 16f).apply { setPadding(dp(4), dp(14), dp(4), 0) })
         addView(SeekBar(context).apply {
             max = 255
-            progress = appearance.darkness
+            progress = appearance.wallpaperFade
+            thumbTintList = ColorStateList.valueOf(foregroundColor)
+            progressTintList = ColorStateList.valueOf(foregroundColor)
+            progressBackgroundTintList = ColorStateList.valueOf(withAlpha(foregroundColor, 70))
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) = Unit
                 override fun onStartTrackingTouch(seekBar: SeekBar?) = Unit
                 override fun onStopTrackingTouch(seekBar: SeekBar?) {
-                    preferences.saveAppearance(preferences.appearance().copy(darkness = progress))
+                    preferences.saveAppearance(preferences.appearance().copy(wallpaperFade = progress))
                 }
             })
         })
@@ -241,6 +268,7 @@ class SettingsActivity : Activity() {
         addView(title(getString(R.string.icon_theme), 16f).apply { setPadding(dp(4), dp(14), dp(4), dp(4)) })
         val provider = BundledIconProvider(context)
         val tiles = mutableMapOf<IconTheme, Pair<LinearLayout, TextView>>()
+        val previews = mutableMapOf<IconTheme, ImageView>()
         val grid = GridLayout(context).apply { columnCount = 2 }
 
         fun updateSelection(selected: IconTheme) = tiles.forEach { (theme, views) ->
@@ -269,8 +297,8 @@ class SettingsActivity : Activity() {
                 isHapticFeedbackEnabled = true
                 contentDescription = enumLabel(theme)
                 addView(ImageView(context).apply {
-                    setImageDrawable(provider.preview(theme, foregroundColor))
                     scaleType = ImageView.ScaleType.FIT_CENTER
+                    previews[theme] = this
                 }, LinearLayout.LayoutParams(dp(48), dp(48)))
                 addView(label, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(30)))
                 setOnClickListener { view ->
@@ -289,6 +317,12 @@ class SettingsActivity : Activity() {
         }
         updateSelection(appearance.iconTheme)
         addView(grid, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+        loader.execute {
+            val decoded = IconTheme.entries.associateWith { provider.preview(it, foregroundColor) }
+            mainExecutor.execute {
+                if (!isDestroyed) decoded.forEach { (theme, drawable) -> previews[theme]?.setImageDrawable(drawable) }
+            }
+        }
     }
 
     private fun iconTileBackground(selected: Boolean) = GradientDrawable().apply {
@@ -308,6 +342,14 @@ class SettingsActivity : Activity() {
             textSize = 18f
             typeface = settingsTypeface
             setTextColor(foregroundColor)
+            thumbTintList = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(backgroundColor, foregroundColor),
+            )
+            trackTintList = ColorStateList(
+                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
+                intArrayOf(withAlpha(foregroundColor, 210), withAlpha(foregroundColor, 70)),
+            )
             isChecked = selected
             setPadding(dp(4), dp(12), dp(4), dp(12))
             setOnCheckedChangeListener { _, checked -> onPick(checked) }
@@ -434,7 +476,7 @@ class SettingsActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == WALLPAPER_REQUEST && resultCode == RESULT_OK) data?.data?.let { uri ->
             runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-                .onSuccess { preferences.saveAppearance(preferences.appearance().copy(wallpaperUri = uri.toString(), pureBlack = false)) }
+                .onSuccess { preferences.saveAppearance(preferences.appearance().copy(wallpaperUri = uri.toString(), solidBackground = false)) }
                 .onFailure { Toast.makeText(this, R.string.wallpaper_error, Toast.LENGTH_LONG).show() }
         }
     }
@@ -448,7 +490,7 @@ class SettingsActivity : Activity() {
         IconTheme.NORMAL -> R.string.option_normal
         IconTheme.LAWNICONS -> R.string.option_lawnicons
         IconTheme.ARCTICONS -> R.string.option_arcticons
-        IconTheme.MONDSTERN -> R.string.option_mondstern
+        IconTheme.APPSTRACT -> R.string.option_appstract
         IconTheme.CUSCON -> R.string.option_cuscon
         IconTheme.DELTA -> R.string.option_delta
         IconTheme.DOLLPHONE -> R.string.option_dollphone
@@ -462,8 +504,86 @@ class SettingsActivity : Activity() {
         ClockPreset.STANDARD -> R.string.option_standard
         ClockPreset.COMPACT -> R.string.option_compact
         ClockPreset.EMPHASIZED -> R.string.option_emphasized
+        WeatherPreset.COMPACT -> R.string.option_compact
+        WeatherPreset.STANDARD -> R.string.option_standard
+        WeatherPreset.EMPHASIZED -> R.string.option_emphasized
+        TemperatureUnit.SYSTEM -> R.string.option_system
+        TemperatureUnit.CELSIUS -> R.string.option_celsius
+        TemperatureUnit.FAHRENHEIT -> R.string.option_fahrenheit
         else -> error("Missing label for $value")
     })
+
+    private fun editWeatherLocation() {
+        val input = EditText(this).apply {
+            setText(preferences.weather().location?.name.orEmpty())
+            hint = getString(R.string.weather_location_hint)
+            setSingleLine(true)
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS
+            setPadding(dp(20), dp(12), dp(20), dp(12))
+        }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(R.string.weather_location)
+            .setView(input)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.find_location, null)
+            .create()
+        var completed = false
+        dialog.setOnDismissListener {
+            if (!completed) {
+                locationRequestGate.invalidate()
+                weatherClient.cancel()
+            }
+        }
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val query = input.text.toString().trim()
+                if (query.isBlank()) return@setOnClickListener
+                val requestToken = locationRequestGate.tryBegin() ?: return@setOnClickListener
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).isEnabled = false
+                dialog.setTitle(R.string.finding_location)
+                Thread({
+                    val result = runCatching {
+                        weatherClient.resolveLocation(
+                            query,
+                            resources.configuration.locales[0].language.ifBlank { "en" },
+                        )
+                    }
+                    mainExecutor.execute {
+                        if (isDestroyed || !dialog.isShowing || !locationRequestGate.finish(requestToken)) return@execute
+                        completed = true
+                        dialog.dismiss()
+                        result.getOrNull()?.takeIf { it.isNotEmpty() }?.let(::chooseWeatherLocation)
+                            ?: Toast.makeText(this, R.string.location_not_found, Toast.LENGTH_LONG).show()
+                    }
+                }, "andSri-weather-location").start()
+            }
+        }
+        dialog.show()
+    }
+
+    private fun chooseWeatherLocation(locations: List<WeatherLocation>) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.choose_location)
+            .setItems(locations.map { it.name }.toTypedArray()) { _, index ->
+                weatherCache.clear()
+                preferences.saveWeather(preferences.weather().copy(location = locations[index]))
+                recreate()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun clearWeather() {
+        weatherCache.clear()
+        preferences.saveWeather(preferences.weather().copy(location = null))
+        recreate()
+    }
+
+    private fun openWeatherProvider() {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://open-meteo.com/"))
+        if (intent.resolveActivity(packageManager) != null) startActivity(intent)
+        else Toast.makeText(this, R.string.action_unavailable, Toast.LENGTH_SHORT).show()
+    }
 
     private fun setLanguage() {
         val tags = arrayOf("", "en", "nl", "hi")
@@ -489,7 +609,7 @@ class SettingsActivity : Activity() {
         }.show()
     }
     private fun confirmReset() = AlertDialog.Builder(this).setTitle(R.string.reset_launcher).setMessage(R.string.reset_message)
-        .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.reset) { _, _ -> preferences.reset(); finish() }.show().let { }
+        .setNegativeButton(R.string.cancel, null).setPositiveButton(R.string.reset) { _, _ -> weatherCache.clear(); preferences.reset(); finish() }.show().let { }
 
     private fun pickApps(title: Int, selected: Set<String>, onSave: (List<String>) -> Unit) {
         val values = apps
@@ -505,11 +625,14 @@ class SettingsActivity : Activity() {
     }
 
     override fun onDestroy() {
+        locationRequestGate.invalidate()
+        weatherClient.cancel()
         loader.shutdownNow()
         super.onDestroy()
     }
 
     private fun title(text: String, size: Float) = TextView(this).apply { this.text = text; textSize = size; typeface = settingsTypeface; setTextColor(foregroundColor); gravity = Gravity.START }
+    private fun withAlpha(color: Int, alpha: Int) = Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     companion object { private const val WALLPAPER_REQUEST = 41 }
 }
