@@ -4,13 +4,15 @@ A quiet, highly efficient Android launcher with one scrolling home screen, delib
 
 ## Screenshots
 
-<p align="center">
-  <img src="docs/screenshots/home.png" width="180" alt="andSri home screen with favorite apps">
-  <img src="docs/screenshots/all-apps.png" width="180" alt="Expanded alphabetical app list">
-  <img src="docs/screenshots/app-actions.png" width="180" alt="App actions menu">
-  <img src="docs/screenshots/settings-organize.png" width="180" alt="Organization and weather settings">
-  <img src="docs/screenshots/settings-appearance.png" width="180" alt="Appearance and icon settings">
-</p>
+| Screen | Light | Dark |
+|---|---|---|
+| Home and weather | <img src="docs/screenshots/light-home-weather.png" width="210" alt="Home and weather in light mode"> | <img src="docs/screenshots/dark-home-weather.png" width="210" alt="Home and weather in dark mode"> |
+| All apps | <img src="docs/screenshots/light-all-apps.png" width="210" alt="All apps in light mode"> | <img src="docs/screenshots/dark-all-apps.png" width="210" alt="All apps in dark mode"> |
+| App actions | <img src="docs/screenshots/light-app-actions.png" width="210" alt="App actions in light mode"> | <img src="docs/screenshots/dark-app-actions.png" width="210" alt="App actions in dark mode"> |
+| Organization and weather | <img src="docs/screenshots/light-settings-organize.png" width="210" alt="Organization and weather settings in light mode"> | <img src="docs/screenshots/dark-settings-organize.png" width="210" alt="Organization and weather settings in dark mode"> |
+| Appearance and icons | <img src="docs/screenshots/light-settings-appearance.png" width="210" alt="Appearance and icon settings in light mode"> | <img src="docs/screenshots/dark-settings-appearance.png" width="210" alt="Appearance and icon settings in dark mode"> |
+
+Weather screenshots use representative local data.
 
 ## Download
 
