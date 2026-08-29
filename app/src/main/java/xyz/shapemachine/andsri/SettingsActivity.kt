@@ -71,7 +71,10 @@ class SettingsActivity : Activity() {
         render()
     }
 
+    @Suppress("DEPRECATION")
     private fun configureSystemBarIcons() {
+        window.setDecorFitsSystemWindows(false)
+        window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
         val lightFlags = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
             WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
         window.decorView.setOnApplyWindowInsetsListener { view, insets ->
@@ -81,8 +84,9 @@ class SettingsActivity : Activity() {
             )
             val statusHeight = insets.getInsets(WindowInsets.Type.statusBars()).top
             view.findViewById<View>(STATUS_BAR_ID)?.apply {
+                val color = if (foregroundColor == Color.BLACK) Color.WHITE else Color.BLACK
                 layoutParams = (layoutParams as FrameLayout.LayoutParams).apply { height = statusHeight }
-                setBackgroundColor(if (foregroundColor == Color.BLACK) Color.WHITE else Color.BLACK)
+                setBackgroundColor(color)
             }
             view.setPadding(0, 0, 0, insets.getInsets(WindowInsets.Type.navigationBars()).bottom)
             insets

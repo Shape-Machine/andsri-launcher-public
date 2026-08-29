@@ -170,7 +170,9 @@ class MainActivity : Activity() {
         listView.setSelection(0)
     }
 
+    @Suppress("DEPRECATION")
     private fun configureWindow() {
+        window.setDecorFitsSystemWindows(false)
         window.isNavigationBarContrastEnforced = false
         window.decorView.setOnApplyWindowInsetsListener { view, insets ->
             val controller = window.insetsController
