@@ -8,7 +8,7 @@ android {
 
     defaultConfig {
         applicationId = "xyz.shapemachine.andsri"
-        minSdk = 36
+        minSdk = 33
         targetSdk = 36
         versionCode = 4
         versionName = "0.4.0"

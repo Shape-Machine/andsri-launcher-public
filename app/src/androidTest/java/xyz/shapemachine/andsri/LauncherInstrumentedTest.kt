@@ -109,6 +109,18 @@ class LauncherInstrumentedTest {
     }
 
     @Test
+    fun testSettingsStartsWithScrollableContent() {
+        val context = instrumentation.targetContext
+        val activity = instrumentation.startActivitySync(
+            android.content.Intent(context, SettingsActivity::class.java)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+        val content = activity.findViewById<android.view.ViewGroup>(android.R.id.content)
+        assertTrue(content.getChildAt(0) is android.widget.ScrollView)
+        activity.finish()
+    }
+
+    @Test
     fun testConfiguredWeatherPrecedesFavoritesAndCollapsedApps() {
         val favorite = AppEntry(android.content.ComponentName("example.favorite", "example.favorite.Main"), "Favorite")
         val rows = HomeRows.build(

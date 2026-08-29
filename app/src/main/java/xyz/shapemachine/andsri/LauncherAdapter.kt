@@ -15,6 +15,7 @@ import android.widget.ImageView
 import android.widget.ImageButton
 import android.widget.TextView
 import android.util.LruCache
+import android.util.TypedValue
 
 class LauncherAdapter(
     private val context: Context,
@@ -130,7 +131,11 @@ class LauncherAdapter(
             addView(LinearLayout(context).apply {
                 gravity = Gravity.CENTER
                 orientation = LinearLayout.HORIZONTAL
-                addView(label(15f).apply { id = WEATHER_SECONDARY_ID; gravity = Gravity.CENTER })
+                addView(label(15f).apply {
+                    id = WEATHER_SECONDARY_ID
+                    gravity = Gravity.CENTER
+                    maxLines = 2
+                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
                 addView(label(18f).apply {
                     id = WEATHER_ATTRIBUTION_ID
                     gravity = Gravity.CENTER
@@ -266,7 +271,11 @@ class LauncherAdapter(
                 orientation = LinearLayout.HORIZONTAL
                 layoutParams = LinearLayout.LayoutParams(-1, -2)
                 addView(View(context), LinearLayout.LayoutParams(dp(48), dp(48)))
-                addView(label(42f).apply { id = TIME_ID; gravity = Gravity.CENTER }, LinearLayout.LayoutParams(0, -2, 1f))
+                addView(label(42f).apply {
+                    id = TIME_ID
+                    gravity = Gravity.CENTER
+                    maxLines = 1
+                }, LinearLayout.LayoutParams(0, -2, 1f))
                 addView(ImageButton(context).apply {
                     id = SETTINGS_ID
                     setImageResource(android.R.drawable.ic_menu_preferences)
@@ -278,14 +287,21 @@ class LauncherAdapter(
                     setOnClickListener { anchor -> anchor.performHapticFeedback(0); onSettingsClick() }
                 }, LinearLayout.LayoutParams(dp(48), dp(48)))
             })
-            addView(label(17f).apply { id = DATE_ID; gravity = Gravity.CENTER; layoutParams = LinearLayout.LayoutParams(-1, -2); setPadding(0, dp(6), 0, 0) })
+            addView(label(17f).apply { id = DATE_ID; gravity = Gravity.CENTER; maxLines = 2; layoutParams = LinearLayout.LayoutParams(-1, -2); setPadding(0, dp(6), 0, 0) })
         }
         val sizes = when (appearance.clockPreset) {
             ClockPreset.COMPACT -> 34f to 15f
             ClockPreset.STANDARD -> 42f to 17f
             ClockPreset.EMPHASIZED -> 52f to 18f
         }
-        container.findViewById<TextView>(TIME_ID).apply { boundTimeView = this; text = timeText; textSize = sizes.first; setTextColor(textColor); typeface = font(); setOnClickListener { onClockClick() } }
+        container.findViewById<TextView>(TIME_ID).apply {
+            boundTimeView = this
+            text = timeText
+            setAutoSizeTextTypeUniformWithConfiguration(24, sizes.first.toInt(), 1, TypedValue.COMPLEX_UNIT_SP)
+            setTextColor(textColor)
+            typeface = font()
+            setOnClickListener { onClockClick() }
+        }
         container.findViewById<ImageButton>(SETTINGS_ID).drawable?.setTint(textColor)
         container.findViewById<TextView>(DATE_ID).apply { boundDateView = this; text = dateText; textSize = sizes.second; setTextColor(textColor); typeface = font(); setOnClickListener { onDateClick() } }
         return container
@@ -296,6 +312,7 @@ class LauncherAdapter(
         val view = recycled as? TextView ?: label(20f).apply { gravity = Gravity.CENTER_VERTICAL; isHapticFeedbackEnabled = true }
         val vertical = when (appearance.density) { DensityPreset.COMPACT -> 11; DensityPreset.STANDARD -> 17; DensityPreset.COMFORTABLE -> 23 }
         view.setPadding(dp(28), dp(vertical), dp(28), dp(vertical))
+        view.minHeight = dp(44)
         view.typeface = font()
         view.setTextColor(textColor)
         view.text = app.label
@@ -386,7 +403,7 @@ class LauncherAdapter(
     private class AdaptiveFavoritesGrid(context: Context) : GridLayout(context) {
         override fun onMeasure(widthSpec: Int, heightSpec: Int) {
             val available = MeasureSpec.getSize(widthSpec) - paddingLeft - paddingRight
-            columnCount = if (available >= (440 * resources.displayMetrics.density).toInt()) 5 else 4
+            columnCount = LayoutPolicy.favoriteColumnCount((available / resources.displayMetrics.density).toInt())
             super.onMeasure(widthSpec, heightSpec)
         }
     }

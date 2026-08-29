@@ -1,6 +1,6 @@
 # andSri
 
-A quiet, highly efficient Android launcher with one scrolling home screen, deliberate customization, and no attention-seeking clutter.
+A quiet, highly efficient launcher for Android 13 and newer, with one scrolling home screen, deliberate customization, and no attention-seeking clutter.
 
 ## Screenshots
 
@@ -18,7 +18,7 @@ Weather screenshots use representative local data.
 
 **[Download the latest signed APK](https://github.com/Shape-Machine/andsri-launcher-public/releases/latest/download/andSri.apk)** · [Release notes](https://github.com/Shape-Machine/andsri-launcher-public/releases/latest) · [SHA-256 checksums](https://github.com/Shape-Machine/andsri-launcher-public/releases/latest/download/SHA256SUMS)
 
-Android may ask your browser or file manager for permission to install the APK. Official releases use certificate SHA-256 `05eab865f1f91c995c59677ff09f777e854e84e9c2ee9e16d868972f052680ea`, so future updates install without clearing launcher settings.
+Requires Android 13 or newer. Android may ask your browser or file manager for permission to install the APK. Official releases use certificate SHA-256 `05eab865f1f91c995c59677ff09f777e854e84e9c2ee9e16d868972f052680ea`, so future updates install without clearing launcher settings.
 
 ## Principles
 

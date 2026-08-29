@@ -177,19 +177,35 @@ class SettingsActivity : Activity() {
         onPick: (T) -> Unit,
     ) {
         addView(title(getString(label), 16f).apply { setPadding(dp(4), dp(14), dp(4), dp(4)) })
+        val labels = values.map(::enumLabel)
+        val availableWidth = dp(resources.configuration.screenWidthDp) - paddingLeft - paddingRight
+        val stackSegments = vertical || LayoutPolicy.shouldStackSegments(
+            availableWidth,
+            labels.map {
+                settingsTypeface.measureText(
+                    it,
+                    android.util.TypedValue.applyDimension(
+                        android.util.TypedValue.COMPLEX_UNIT_SP,
+                        13f,
+                        resources.displayMetrics,
+                    ),
+                )
+            },
+            dp(12),
+        )
         val ids = mutableMapOf<Int, T>()
         addView(RadioGroup(context).apply {
-            orientation = if (vertical) RadioGroup.VERTICAL else RadioGroup.HORIZONTAL
+            orientation = if (stackSegments) RadioGroup.VERTICAL else RadioGroup.HORIZONTAL
             values.forEachIndexed { index, value ->
                 val id = View.generateViewId()
                 ids[id] = value
                 addView(RadioButton(context).apply {
                     this.id = id
-                    text = enumLabel(value)
+                    text = labels[index]
                     textSize = 13f
                     typeface = if (value is FontPreset) fontTypeface(value) else settingsTypeface
                     buttonDrawable = null
-                    background = segmentBackground(index, values.lastIndex, vertical)
+                    background = segmentBackground(index, values.lastIndex, stackSegments)
                     setTextColor(ColorStateList(
                         arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
                         intArrayOf(backgroundColor, foregroundColor),
@@ -198,7 +214,7 @@ class SettingsActivity : Activity() {
                     minHeight = dp(44)
                     isChecked = value == selected
                     setPadding(dp(6), dp(8), dp(6), dp(8))
-                }, if (vertical) {
+                }, if (stackSegments) {
                     RadioGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
                 } else {
                     RadioGroup.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
@@ -206,6 +222,12 @@ class SettingsActivity : Activity() {
             }
             setOnCheckedChangeListener { _, checkedId -> ids[checkedId]?.let(onPick) }
         }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+    }
+
+    private fun Typeface.measureText(text: String, textSize: Float) = android.graphics.Paint().run {
+        typeface = this@measureText
+        this.textSize = textSize
+        measureText(text)
     }
 
     private fun fontTypeface(font: FontPreset): Typeface = resources.getFont(when (font) {
@@ -286,7 +308,7 @@ class SettingsActivity : Activity() {
                 typeface = settingsTypeface
                 setTextColor(foregroundColor)
                 gravity = Gravity.CENTER
-                maxLines = 1
+                maxLines = 2
             }
             val tile = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
@@ -300,7 +322,9 @@ class SettingsActivity : Activity() {
                     scaleType = ImageView.ScaleType.FIT_CENTER
                     previews[theme] = this
                 }, LinearLayout.LayoutParams(dp(48), dp(48)))
-                addView(label, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(30)))
+                addView(label, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = dp(6)
+                })
                 setOnClickListener { view ->
                     view.performHapticFeedback(0)
                     preferences.saveAppearance(preferences.appearance().copy(iconTheme = theme))
@@ -432,7 +456,11 @@ class SettingsActivity : Activity() {
             }
         }
         val reorderContent = LinearLayout(this).apply {
-            addView(list, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, resources.displayMetrics.heightPixels / 2))
+            val availableHeight = window.decorView.height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+            addView(list, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                LayoutPolicy.reorderListHeight(availableHeight, dp(480)),
+            ))
         }
         AlertDialog.Builder(this).setTitle(R.string.reorder_favorites).setMessage(R.string.drag_reorder_hint)
             .setView(reorderContent).setNegativeButton(R.string.cancel, null)
