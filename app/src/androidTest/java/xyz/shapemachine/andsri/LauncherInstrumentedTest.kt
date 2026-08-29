@@ -41,6 +41,7 @@ class LauncherInstrumentedTest {
         assertNotNull(provider.icon("com.android.settings", IconTheme.DELTA, Color.WHITE))
         assertNotNull(provider.icon("com.android.settings", IconTheme.DOLLPHONE, Color.WHITE))
         assertNotNull(provider.icon("com.android.settings", IconTheme.SNOW, Color.WHITE))
+        assertNotNull(provider.cachedIcon("com.android.settings", IconTheme.ARCTICONS, Color.WHITE))
     }
 
     @Test
@@ -116,7 +117,12 @@ class LauncherInstrumentedTest {
                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
         )
         val content = activity.findViewById<android.view.ViewGroup>(android.R.id.content)
-        assertTrue(content.getChildAt(0) is android.widget.ScrollView)
+        val root = content.getChildAt(0) as android.widget.FrameLayout
+        assertTrue(root.getChildAt(0) is android.widget.ScrollView)
+        instrumentation.waitForIdleSync()
+        val statusBar = root.getChildAt(1)
+        assertTrue(statusBar.layoutParams.height > 0)
+        assertTrue((statusBar.background as android.graphics.drawable.ColorDrawable).color in setOf(Color.BLACK, Color.WHITE))
         activity.finish()
     }
 

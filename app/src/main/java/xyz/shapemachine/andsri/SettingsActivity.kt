@@ -19,9 +19,11 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.widget.BaseAdapter
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -72,11 +74,17 @@ class SettingsActivity : Activity() {
     private fun configureSystemBarIcons() {
         val lightFlags = WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS or
             WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS
-        window.decorView.setOnApplyWindowInsetsListener { _, insets ->
+        window.decorView.setOnApplyWindowInsetsListener { view, insets ->
             window.insetsController?.setSystemBarsAppearance(
                 if (AppearanceResolver.isDark(this, preferences.appearance())) 0 else lightFlags,
                 lightFlags,
             )
+            val statusHeight = insets.getInsets(WindowInsets.Type.statusBars()).top
+            view.findViewById<View>(STATUS_BAR_ID)?.apply {
+                layoutParams = (layoutParams as FrameLayout.LayoutParams).apply { height = statusHeight }
+                setBackgroundColor(if (foregroundColor == Color.BLACK) Color.WHITE else Color.BLACK)
+            }
+            view.setPadding(0, 0, 0, insets.getInsets(WindowInsets.Type.navigationBars()).bottom)
             insets
         }
     }
@@ -144,7 +152,16 @@ class SettingsActivity : Activity() {
             section(R.string.danger_zone)
             action(R.string.reset_launcher, ::confirmReset)
         }
-        setContentView(ScrollView(this).apply { setBackgroundColor(backgroundColor); addView(content) })
+        val scroll = ScrollView(this).apply { setBackgroundColor(backgroundColor); addView(content) }
+        setContentView(FrameLayout(this).apply {
+            setBackgroundColor(backgroundColor)
+            addView(scroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            addView(View(this@SettingsActivity).apply { id = STATUS_BAR_ID }, FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                Gravity.TOP,
+            ))
+        })
     }
 
     private fun LinearLayout.section(label: Int) = addView(title(getString(label), 15f).apply {
@@ -662,5 +679,8 @@ class SettingsActivity : Activity() {
     private fun title(text: String, size: Float) = TextView(this).apply { this.text = text; textSize = size; typeface = settingsTypeface; setTextColor(foregroundColor); gravity = Gravity.START }
     private fun withAlpha(color: Int, alpha: Int) = Color.argb(alpha, Color.red(color), Color.green(color), Color.blue(color))
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-    companion object { private const val WALLPAPER_REQUEST = 41 }
+    companion object {
+        private const val WALLPAPER_REQUEST = 41
+        private const val STATUS_BAR_ID = 3001
+    }
 }

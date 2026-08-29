@@ -27,6 +27,17 @@ class BundledIconProvider(private val context: Context) {
         return themedDrawable(theme, file, color)
     }
 
+    fun cachedIcon(packageName: String, theme: IconTheme, color: Int): Drawable? {
+        if (theme == IconTheme.NORMAL) return null
+        val file = mapping(theme)[packageName] ?: return null
+        return cache.get("${theme.name}:$file")?.state?.newDrawable(context.resources)?.mutate()?.apply {
+            if (theme == IconTheme.LAWNICONS || theme == IconTheme.ARCTICONS || theme == IconTheme.SNOW) setTint(color)
+        }
+    }
+
+    fun supports(packageName: String, theme: IconTheme) =
+        theme != IconTheme.NORMAL && mapping(theme).containsKey(packageName)
+
     fun preview(theme: IconTheme, color: Int): Drawable? {
         if (theme == IconTheme.NORMAL) return runCatching {
             context.packageManager.getApplicationIcon("com.android.settings")
@@ -63,6 +74,7 @@ class BundledIconProvider(private val context: Context) {
     }.getOrNull()
 
     fun preload(packageNames: Collection<String>, theme: IconTheme, color: Int) {
+        if (theme != IconTheme.NORMAL) mapping(theme)
         packageNames.forEach { icon(it, theme, color) }
     }
 

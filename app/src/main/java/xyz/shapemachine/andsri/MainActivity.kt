@@ -49,6 +49,7 @@ class MainActivity : Activity() {
     private val loader = Executors.newSingleThreadExecutor()
     private val reloadLock = Any()
     private var reloadRunning = false
+    private var reloadPosted = false
     private var refreshDirty = true
     private var packagesDirty = true
     private var rowsDirty = true
@@ -158,6 +159,7 @@ class MainActivity : Activity() {
         preferences.unregisterChangeListener(preferenceListener)
         getSystemService(LauncherApps::class.java).unregisterCallback(launcherCallback)
         loader.shutdownNow()
+        adapter.close()
         weatherRequestGate.invalidate()
         weatherClient.cancel()
         super.onDestroy()
@@ -228,6 +230,7 @@ class MainActivity : Activity() {
     private fun prepareReload(work: ReloadWork): ReloadUpdate {
         var state = preferences.snapshot()
         if (work.scanPackages || cachedAllApps.isEmpty()) {
+            adapter.clearDynamicIcons()
             cachedAllApps = appRepository.allApps(state.labels)
             state = preferences.reconcileInstalled(
                 cachedAllApps.mapTo(mutableSetOf()) { it.component.flattenToString() },
@@ -291,7 +294,18 @@ class MainActivity : Activity() {
             rowsDirty = rowsDirty || rowsChanged
             favoritePreloadDirty = favoritePreloadDirty || preloadFavorites
         }
-        if (isActive) startReloadIfNeeded()
+        if (isActive) postReload()
+    }
+
+    private fun postReload() {
+        val shouldPost = synchronized(reloadLock) {
+            if (reloadPosted) false else true.also { reloadPosted = it }
+        }
+        if (!shouldPost) return
+        handler.post {
+            synchronized(reloadLock) { reloadPosted = false }
+            startReloadIfNeeded()
+        }
     }
 
     private fun applyAppearance(config: AppearanceConfig, textColor: Int, wallpaperUpdate: WallpaperUpdate?) {

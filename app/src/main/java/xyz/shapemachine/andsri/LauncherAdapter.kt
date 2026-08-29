@@ -16,6 +16,7 @@ import android.widget.ImageButton
 import android.widget.TextView
 import android.util.LruCache
 import android.util.TypedValue
+import java.util.concurrent.Executors
 
 class LauncherAdapter(
     private val context: Context,
@@ -29,6 +30,7 @@ class LauncherAdapter(
     private val onAppsToggle: (Boolean) -> Unit,
 ) : BaseAdapter() {
     private data class CachedIcon(val state: Drawable.ConstantState, val estimatedBytes: Int)
+    private data class IconKey(val component: String, val theme: IconTheme, val color: Int)
 
     private var rows: List<HomeRow> = listOf(HomeRow.Header)
     private var appearance = AppearanceConfig()
@@ -47,6 +49,26 @@ class LauncherAdapter(
         override fun sizeOf(key: String, value: CachedIcon) = value.estimatedBytes
     }
     private val fontCache = mutableMapOf<FontPreset, Typeface>()
+    private val iconLoader = Executors.newSingleThreadExecutor()
+    private val iconLock = Any()
+    private val pendingIconCallbacks = mutableMapOf<IconKey, MutableList<(IconKey, Drawable) -> Unit>>()
+    private val failedIcons = mutableSetOf<IconKey>()
+    @Volatile private var closed = false
+    private val rowFallbacks = object : LruCache<String, Drawable>(128) {}
+    private val favoriteFallbacks = object : LruCache<String, Drawable>(128) {}
+    private val appClickListener = View.OnClickListener { anchor ->
+        (anchor.tag as? AppEntry)?.let { app ->
+            anchor.performHapticFeedback(0)
+            onAppClick(app)
+        }
+    }
+    private val appLongClickListener = View.OnLongClickListener { anchor ->
+        (anchor.tag as? AppEntry)?.let { app ->
+            anchor.performHapticFeedback(0)
+            onAppLongClick(anchor, app)
+            true
+        } ?: false
+    }
 
     override fun getCount() = rows.size
     override fun getItem(position: Int) = rows[position]
@@ -107,6 +129,17 @@ class LauncherAdapter(
     fun preloadFavoriteIcons(apps: List<AppEntry>, config: AppearanceConfig, color: Int) {
         if (config.iconTheme == IconTheme.NORMAL) apps.forEach { normalIcon(it) }
         else iconProvider.preload(apps.map { it.component.packageName }, config.iconTheme, color)
+    }
+
+    fun close() {
+        closed = true
+        synchronized(iconLock) { pendingIconCallbacks.clear() }
+        iconLoader.shutdownNow()
+    }
+
+    fun clearDynamicIcons() {
+        normalIconCache.evictAll()
+        synchronized(iconLock) { failedIcons.clear() }
     }
 
     override fun getView(position: Int, recycled: View?, parent: ViewGroup): View = when (val row = rows[position]) {
@@ -317,14 +350,18 @@ class LauncherAdapter(
         view.setTextColor(textColor)
         view.text = app.label
         view.contentDescription = app.label
+        view.tag = app
         if (appearance.displayMode != AppDisplayMode.TEXT) {
-            val icon = iconFor(app)
-            icon.setBounds(0, 0, dp(34), dp(34))
-            view.setCompoundDrawables(icon, null, null, null)
+            bindIcon(app, favorite = false) { key, icon ->
+                if (view.tag == app && appearance.displayMode != AppDisplayMode.TEXT && iconKey(app) == key) {
+                    icon.setBounds(0, 0, dp(34), dp(34))
+                    view.setCompoundDrawables(icon, null, null, null)
+                }
+            }
             view.compoundDrawablePadding = dp(14)
         } else view.setCompoundDrawables(null, null, null, null)
-        view.setOnClickListener { anchor -> anchor.performHapticFeedback(0); onAppClick(app) }
-        view.setOnLongClickListener { anchor -> anchor.performHapticFeedback(0); onAppLongClick(anchor, app); true }
+        view.setOnClickListener(appClickListener)
+        view.setOnLongClickListener(appLongClickListener)
         return view
     }
 
@@ -347,11 +384,14 @@ class LauncherAdapter(
                 scaleType = ImageView.ScaleType.CENTER_INSIDE
                 isHapticFeedbackEnabled = true
             }.also(grid::addView)
-            icon.setImageDrawable(iconFor(app))
+            icon.tag = app
+            bindIcon(app, favorite = true) { key, drawable ->
+                if (icon.tag == app && iconKey(app) == key) icon.setImageDrawable(drawable)
+            }
             icon.contentDescription = app.label
             icon.tooltipText = app.label
-            icon.setOnClickListener { anchor -> anchor.performHapticFeedback(0); onAppClick(app) }
-            icon.setOnLongClickListener { anchor -> anchor.performHapticFeedback(0); onAppLongClick(anchor, app); true }
+            icon.setOnClickListener(appClickListener)
+            icon.setOnLongClickListener(appLongClickListener)
         }
         return grid
     }
@@ -389,6 +429,55 @@ class LauncherAdapter(
         normalIcon(app) ?: LetterTileDrawable(app.label, IconTheme.LAWNICONS, textColor)
     } else iconProvider.icon(app.component.packageName, appearance.iconTheme, textColor)
         ?: LetterTileDrawable(app.label, appearance.iconTheme, textColor)
+
+    private fun iconKey(app: AppEntry) = IconKey(app.component.flattenToString(), appearance.iconTheme, textColor)
+
+    private fun bindIcon(app: AppEntry, favorite: Boolean, onReady: (IconKey, Drawable) -> Unit) {
+        val key = iconKey(app)
+        val cached = if (key.theme == IconTheme.NORMAL) {
+            normalIconCache.get(key.component)?.state?.newDrawable(context.resources)
+        } else {
+            iconProvider.cachedIcon(app.component.packageName, key.theme, key.color)
+        }
+        if (cached != null) {
+            onReady(key, cached)
+            return
+        }
+        val fallbackKey = "${app.label}:${key.theme}:${key.color}"
+        val fallbacks = if (favorite) favoriteFallbacks else rowFallbacks
+        onReady(key, fallbacks.get(fallbackKey) ?: LetterTileDrawable(app.label, key.theme, key.color).also {
+            fallbacks.put(fallbackKey, it)
+        })
+        if (key.theme != IconTheme.NORMAL && !iconProvider.supports(app.component.packageName, key.theme)) return
+        requestIcon(key, app, onReady)
+    }
+
+    private fun requestIcon(key: IconKey, app: AppEntry, onReady: (IconKey, Drawable) -> Unit) {
+        val shouldLoad = synchronized(iconLock) {
+            if (closed || key in failedIcons) return
+            pendingIconCallbacks.getOrPut(key) { mutableListOf() }.let { callbacks ->
+                callbacks.add(onReady)
+                callbacks.size == 1
+            }
+        }
+        if (!shouldLoad) return
+        val task = Runnable {
+            val loaded = runCatching {
+                if (key.theme == IconTheme.NORMAL) normalIcon(app)
+                else iconProvider.icon(app.component.packageName, key.theme, key.color)
+            }.getOrNull()
+            val callbacks = synchronized(iconLock) {
+                if (loaded == null) failedIcons += key
+                pendingIconCallbacks.remove(key).orEmpty()
+            }
+            if (loaded != null && !closed) context.mainExecutor.execute {
+                if (!closed) callbacks.forEach { it(key, loaded.constantState?.newDrawable(context.resources) ?: loaded) }
+            }
+        }
+        runCatching { iconLoader.execute(task) }.onFailure {
+            synchronized(iconLock) { pendingIconCallbacks.remove(key) }
+        }
+    }
 
     companion object {
         private const val TIME_ID = 1001
