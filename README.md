@@ -51,4 +51,6 @@ No signing key is included. Debug builds require uninstalling an official instal
 
 ## Licensing
 
-No license is granted for andSri's original source. Third-party fonts and icons retain their licenses: [third_party](third_party/README.md).
+andSri is source-available. Use, modify, and redistribute it free of charge. Monetization is prohibited. Distributed forks must remain free and publish their source under the same terms. See [LICENSE](LICENSE).
+
+Third-party fonts and icons retain their licenses: [third_party](third_party/README.md).
