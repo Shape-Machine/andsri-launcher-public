@@ -257,7 +257,7 @@ class LauncherAdapter(
                     "$symbol  $temperature · $condition · $age"
                 }
                 secondary.visibility = View.VISIBLE
-                attribution.visibility = View.VISIBLE
+                attribution.visibility = View.GONE
                 tertiary.visibility = View.VISIBLE
                 if (snapshot != null && snapshot.forecast.size >= 12) {
                     secondary.text = context.getString(
