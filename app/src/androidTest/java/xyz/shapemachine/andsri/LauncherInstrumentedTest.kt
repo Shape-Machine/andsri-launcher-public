@@ -54,7 +54,12 @@ class LauncherInstrumentedTest {
         preferences.saveFavorites(listOf("one/component", "gone/component"))
         preferences.hide("gone/component")
         preferences.saveCustomLabel("one/component", "Renamed")
-        preferences.saveAppearance(AppearanceConfig(font = FontPreset.MONOSPACE, appearanceMode = AppearanceMode.DARK))
+        preferences.saveAppearance(AppearanceConfig(
+            font = FontPreset.MONOSPACE,
+            appearanceMode = AppearanceMode.DARK,
+            showNextAlarm = true,
+            secondaryTimeZoneId = "Asia/Kolkata",
+        ))
         preferences.saveWeather(WeatherConfig(WeatherLocation("Amsterdam", 52.37, 4.89), WeatherPreset.COMPACT, TemperatureUnit.CELSIUS))
         preferences.setAppsExpanded(true)
         preferences.reconcileInstalled(setOf("one/component"), preferences.snapshot())
@@ -62,6 +67,8 @@ class LauncherInstrumentedTest {
         assertTrue(preferences.hiddenComponents().isEmpty())
         assertTrue(preferences.customLabels()["one/component"] == "Renamed")
         assertTrue(preferences.appearance().font == FontPreset.MONOSPACE)
+        assertTrue(preferences.appearance().showNextAlarm)
+        assertTrue(preferences.appearance().secondaryTimeZoneId == "Asia/Kolkata")
         assertTrue(preferences.weather().location?.name == "Amsterdam")
         assertTrue(preferences.weather().preset == WeatherPreset.COMPACT)
         assertTrue(preferences.appsExpanded())

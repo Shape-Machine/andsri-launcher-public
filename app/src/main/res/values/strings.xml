@@ -43,7 +43,11 @@
     <string name="weather_refresh_failed">Could not refresh · tap to retry</string>
     <string name="weather_tap_for_forecast">Tap to load forecast</string>
     <string name="weather_next_four_hours">4h · %1$s</string>
-    <string name="weather_next_twelve_hours">12h · %1$d–%2$d° · precipitation %3$d%%</string>
+    <string name="weather_forecast_wet">12h · %1$d–%2$d° · %3$s %4$s · %5$d%%</string>
+    <string name="weather_forecast_clearing">12h · %1$d–%2$d° · clearing %3$s</string>
+    <string name="weather_forecast_dry">12h · %1$d–%2$d° · dry</string>
+    <string name="weather_precipitation">Precipitation</string>
+    <plurals name="weather_hours_from_now"><item quantity="one">in %d h</item><item quantity="other">in %d h</item></plurals>
     <string name="weather_updated_just_now">just now</string>
     <plurals name="weather_updated_minutes"><item quantity="one">%d minute ago</item><item quantity="other">%d minutes ago</item></plurals>
     <plurals name="weather_updated_hours"><item quantity="one">%d hour ago</item><item quantity="other">%d hours ago</item></plurals>
@@ -76,6 +80,10 @@
     <string name="clock_preset">Clock style</string>
     <string name="list_density">List density</string>
     <string name="solid_background">Solid background</string>
+    <string name="show_next_alarm">Show next alarm</string>
+    <string name="next_alarm_value">Alarm · %1$s</string>
+    <string name="secondary_time_zone">Second timezone</string>
+    <string name="option_off">Off</string>
     <string name="general">GENERAL</string>
     <string name="language">Language</string>
     <string name="default_home">Default Home app</string>

@@ -38,6 +38,8 @@ class LauncherAdapter(
     private var appearance = AppearanceConfig()
     private var timeText = ""
     private var dateText = ""
+    private var secondaryTimeText = ""
+    private var nextAlarmText = ""
     private var textColor = Color.WHITE
     private var weatherConfig = WeatherConfig()
     private var weatherSnapshot: WeatherSnapshot? = null
@@ -45,6 +47,8 @@ class LauncherAdapter(
     private var weatherError: String? = null
     private var boundTimeView: TextView? = null
     private var boundDateView: TextView? = null
+    private var boundSecondaryTimeView: TextView? = null
+    private var boundNextAlarmView: TextView? = null
     private var boundWeatherView: LinearLayout? = null
     private val iconProvider = BundledIconProvider(context)
     private val normalIconCache = object : LruCache<String, CachedIcon>(4 * 1024 * 1024) {
@@ -121,11 +125,21 @@ class LauncherAdapter(
         boundWeatherView?.let(::bindWeather)
     }
 
-    fun updateClock(time: String, date: String) {
+    fun updateClock(time: String, date: String, secondaryTime: String, nextAlarm: String) {
         timeText = time
         dateText = date
+        secondaryTimeText = secondaryTime
+        nextAlarmText = nextAlarm
         boundTimeView?.text = time
         boundDateView?.text = date
+        boundSecondaryTimeView?.apply {
+            text = secondaryTime
+            visibility = if (secondaryTime.isBlank()) View.GONE else View.VISIBLE
+        }
+        boundNextAlarmView?.apply {
+            text = nextAlarm
+            visibility = if (nextAlarm.isBlank()) View.GONE else View.VISIBLE
+        }
     }
 
     fun preloadFavoriteIcons(apps: List<AppEntry>, config: AppearanceConfig, color: Int) {
@@ -266,13 +280,7 @@ class LauncherAdapter(
                             "${weatherSymbol(it.weatherCode)} ${it.temperature.roundToInt()}°"
                         },
                     )
-                    val temperatures = snapshot.forecast.map { it.temperature }
-                    tertiary.text = context.getString(
-                        R.string.weather_next_twelve_hours,
-                        temperatures.min().roundToInt(),
-                        temperatures.max().roundToInt(),
-                        snapshot.forecast.maxOf { it.precipitationProbability },
-                    )
+                    tertiary.text = forecastSummary(snapshot.forecast)
                 } else {
                     secondary.text = context.getString(R.string.weather_tap_for_forecast)
                     tertiary.text = ""
@@ -338,6 +346,48 @@ class LauncherAdapter(
         else -> "·"
     }
 
+    private fun forecastSummary(forecast: List<ForecastHour>): String {
+        val low = forecast.minOf { it.temperature }.roundToInt()
+        val high = forecast.maxOf { it.temperature }.roundToInt()
+        val wetIndex = forecast.indexOfFirst {
+            it.precipitationProbability >= 50 || it.weatherCode in PRECIPITATION_CODES
+        }
+        if (wetIndex >= 0) {
+            val condition = context.getString(
+                when (forecast[wetIndex].weatherCode) {
+                    in SNOW_CODES -> R.string.weather_snow
+                    in THUNDER_CODES -> R.string.weather_thunderstorm
+                    in RAIN_CODES -> R.string.weather_rain
+                    else -> R.string.weather_precipitation
+                },
+            )
+            val timing = context.resources.getQuantityString(
+                R.plurals.weather_hours_from_now,
+                wetIndex + 1,
+                wetIndex + 1,
+            )
+            return context.getString(
+                R.string.weather_forecast_wet,
+                low,
+                high,
+                condition,
+                timing,
+                forecast.maxOf { it.precipitationProbability },
+            )
+        }
+        val clearingIndex = forecast.indexOfFirst { it.weatherCode in 0..2 }
+            .takeIf { forecast.first().weatherCode !in 0..2 && it > 0 }
+        if (clearingIndex != null) {
+            val timing = context.resources.getQuantityString(
+                R.plurals.weather_hours_from_now,
+                clearingIndex + 1,
+                clearingIndex + 1,
+            )
+            return context.getString(R.string.weather_forecast_clearing, low, high, timing)
+        }
+        return context.getString(R.string.weather_forecast_dry, low, high)
+    }
+
     private fun weatherAge(snapshot: WeatherSnapshot): String {
         val minutes = ((System.currentTimeMillis() - snapshot.fetchedAtMillis).coerceAtLeast(0L) / 60_000L).toInt()
         return when {
@@ -376,6 +426,14 @@ class LauncherAdapter(
                 }, LinearLayout.LayoutParams(dp(48), dp(48)))
             })
             addView(label(17f).apply { id = DATE_ID; gravity = Gravity.CENTER; maxLines = 2; layoutParams = LinearLayout.LayoutParams(-1, -2); setPadding(0, dp(6), 0, 0) })
+            addView(label(15f).apply { id = SECONDARY_TIME_ID; gravity = Gravity.CENTER; maxLines = 1; setPadding(0, dp(4), 0, 0) })
+            addView(label(14f).apply {
+                id = NEXT_ALARM_ID
+                gravity = Gravity.CENTER
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                setPadding(0, dp(4), 0, 0)
+            })
         }
         val sizes = when (appearance.clockPreset) {
             ClockPreset.COMPACT -> 34f to 15f
@@ -392,6 +450,21 @@ class LauncherAdapter(
         }
         container.findViewById<ImageButton>(SETTINGS_ID).drawable?.setTint(textColor)
         container.findViewById<TextView>(DATE_ID).apply { boundDateView = this; text = dateText; textSize = sizes.second; setTextColor(textColor); typeface = font(); setOnClickListener { onDateClick() } }
+        container.findViewById<TextView>(SECONDARY_TIME_ID).apply {
+            boundSecondaryTimeView = this
+            text = secondaryTimeText
+            visibility = if (secondaryTimeText.isBlank()) View.GONE else View.VISIBLE
+            setTextColor(textColor)
+            typeface = font()
+        }
+        container.findViewById<TextView>(NEXT_ALARM_ID).apply {
+            boundNextAlarmView = this
+            text = nextAlarmText
+            visibility = if (nextAlarmText.isBlank()) View.GONE else View.VISIBLE
+            setTextColor(textColor)
+            typeface = font()
+            setOnClickListener { onClockClick() }
+        }
         return container
     }
 
@@ -542,7 +615,13 @@ class LauncherAdapter(
         private const val WEATHER_SECONDARY_ID = 1005
         private const val WEATHER_ATTRIBUTION_ID = 1006
         private const val WEATHER_TERTIARY_ID = 1007
+        private const val SECONDARY_TIME_ID = 1008
+        private const val NEXT_ALARM_ID = 1009
         private const val SECTION_GAP_DP = 24
+        private val RAIN_CODES = setOf(51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82)
+        private val SNOW_CODES = setOf(71, 73, 75, 77, 85, 86)
+        private val THUNDER_CODES = setOf(95, 96, 99)
+        private val PRECIPITATION_CODES = RAIN_CODES + SNOW_CODES + THUNDER_CODES
     }
 
     private class AdaptiveFavoritesGrid(context: Context) : GridLayout(context) {

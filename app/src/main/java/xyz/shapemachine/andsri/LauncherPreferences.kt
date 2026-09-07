@@ -30,6 +30,10 @@ class LauncherPreferences(context: Context) {
         iconTheme = enumValue(KEY_THEME, IconTheme.ARCTICONS),
         appearanceMode = enumValue(KEY_APPEARANCE_MODE, AppearanceMode.SYSTEM),
         clockPreset = enumValue(KEY_CLOCK_PRESET, ClockPreset.STANDARD),
+        showNextAlarm = preferences.getBoolean(KEY_SHOW_NEXT_ALARM, false),
+        secondaryTimeZoneId = preferences.getString(KEY_SECONDARY_TIME_ZONE, null)?.takeIf {
+            runCatching { java.time.ZoneId.of(it) }.isSuccess
+        },
     )
 
     fun weather() = WeatherConfig(
@@ -81,13 +85,17 @@ class LauncherPreferences(context: Context) {
     fun setAppsExpanded(expanded: Boolean) = preferences.edit().putBoolean(KEY_APPS_EXPANDED, expanded).apply()
 
     fun saveAppearance(value: AppearanceConfig) {
-        preferences.edit().putString(KEY_WALLPAPER, value.wallpaperUri)
+        val editor = preferences.edit().putString(KEY_WALLPAPER, value.wallpaperUri)
             .putInt(KEY_WALLPAPER_FADE, value.wallpaperFade.coerceIn(0, 255))
             .putBoolean(KEY_SOLID_BACKGROUND, value.solidBackground)
             .putString(KEY_MODE, value.displayMode.name).putString(KEY_FONT, value.font.name)
             .putString(KEY_DENSITY, value.density.name).putString(KEY_THEME, value.iconTheme.name)
             .putString(KEY_APPEARANCE_MODE, value.appearanceMode.name)
-            .putString(KEY_CLOCK_PRESET, value.clockPreset.name).apply()
+            .putString(KEY_CLOCK_PRESET, value.clockPreset.name)
+            .putBoolean(KEY_SHOW_NEXT_ALARM, value.showNextAlarm)
+        value.secondaryTimeZoneId?.let { editor.putString(KEY_SECONDARY_TIME_ZONE, it) }
+            ?: editor.remove(KEY_SECONDARY_TIME_ZONE)
+        editor.apply()
     }
 
     fun reconcileInstalled(components: Set<String>, state: LauncherState): LauncherState {
@@ -146,5 +154,7 @@ class LauncherPreferences(context: Context) {
         internal const val KEY_THEME = "icon_theme"
         private const val KEY_APPEARANCE_MODE = "appearance_mode"
         private const val KEY_CLOCK_PRESET = "clock_preset"
+        internal const val KEY_SHOW_NEXT_ALARM = "show_next_alarm"
+        internal const val KEY_SECONDARY_TIME_ZONE = "secondary_time_zone"
     }
 }

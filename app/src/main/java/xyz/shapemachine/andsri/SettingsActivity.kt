@@ -137,6 +137,14 @@ class SettingsActivity : Activity() {
             enumControl(R.string.clock_preset, ClockPreset.entries, appearance.clockPreset) {
                 preferences.saveAppearance(preferences.appearance().copy(clockPreset = it))
             }
+            switchControl(R.string.show_next_alarm, appearance.showNextAlarm) {
+                preferences.saveAppearance(preferences.appearance().copy(showNextAlarm = it))
+            }
+            action(
+                R.string.secondary_time_zone,
+                ::chooseSecondaryTimeZone,
+                appearance.secondaryTimeZoneId?.let(::timeZoneLabel) ?: getString(R.string.option_off),
+            )
             enumControl(R.string.list_density, DensityPreset.entries, appearance.density) {
                 preferences.saveAppearance(preferences.appearance().copy(density = it)); recreate()
             }
@@ -648,6 +656,40 @@ class SettingsActivity : Activity() {
 
     private fun openHomeSettings() = startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
 
+    private fun chooseSecondaryTimeZone() {
+        val labels = listOf(getString(R.string.option_off), "UTC") + TIME_ZONE_REGIONS
+        AlertDialog.Builder(this).setTitle(R.string.secondary_time_zone)
+            .setItems(labels.toTypedArray()) { _, index ->
+                when (index) {
+                    0 -> saveSecondaryTimeZone(null)
+                    1 -> saveSecondaryTimeZone("UTC")
+                    else -> chooseSecondaryTimeZoneInRegion(TIME_ZONE_REGIONS[index - 2])
+                }
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun chooseSecondaryTimeZoneInRegion(region: String) {
+        val zones = java.time.ZoneId.getAvailableZoneIds().asSequence()
+            .filter { it.startsWith("$region/") }
+            .sorted()
+            .toList()
+        AlertDialog.Builder(this).setTitle(region)
+            .setItems(zones.map { it.substringAfter('/').replace('_', ' ') }.toTypedArray()) { _, index ->
+                saveSecondaryTimeZone(zones[index])
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun saveSecondaryTimeZone(id: String?) {
+        preferences.saveAppearance(preferences.appearance().copy(secondaryTimeZoneId = id))
+        recreate()
+    }
+
+    private fun timeZoneLabel(id: String) = id.replace('_', ' ')
+
     private fun showLicenses() {
         val files = assets.list("licenses").orEmpty().sorted()
         val names = files.map { it.substringBeforeLast('.').replace('-', ' ').lowercase().replaceFirstChar(Char::titlecase) }
@@ -687,5 +729,8 @@ class SettingsActivity : Activity() {
     companion object {
         private const val WALLPAPER_REQUEST = 41
         private const val STATUS_BAR_ID = 3001
+        private val TIME_ZONE_REGIONS = listOf(
+            "Africa", "America", "Antarctica", "Arctic", "Asia", "Atlantic", "Australia", "Europe", "Indian", "Pacific",
+        )
     }
 }

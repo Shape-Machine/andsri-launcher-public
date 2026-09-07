@@ -2,6 +2,7 @@ package xyz.shapemachine.andsri
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.AlarmManager
 import android.app.role.RoleManager
 import android.content.ComponentName
 import android.content.Intent
@@ -34,6 +35,7 @@ import android.widget.Toast
 import java.text.DateFormat
 import java.util.Calendar
 import java.util.Date
+import java.util.TimeZone
 import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
@@ -63,6 +65,10 @@ class MainActivity : Activity() {
     @Volatile private var displayedWallpaper: String? = null
     private lateinit var timeFormatter: DateFormat
     private lateinit var dateFormatter: DateFormat
+    private var secondaryTimeFormatter: DateFormat? = null
+    private var secondaryTimeZoneLabel = ""
+    private var nextAlarmTriggerMillis: Long? = null
+    private var nextAlarmDisplayText = ""
     private val clockCalendar = Calendar.getInstance()
     private var displayedDay = Int.MIN_VALUE
     private var displayedDate = ""
@@ -144,7 +150,9 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         isActive = true
-        refreshClockFormatters()
+        val appearance = preferences.appearance()
+        refreshClockFormatters(appearance)
+        refreshNextAlarm(appearance)
         startReloadIfNeeded()
         clockTick.run()
     }
@@ -407,14 +415,33 @@ class MainActivity : Activity() {
         adapter.updateClock(
             timeFormatter.format(now),
             displayedDate,
+            secondaryTimeFormatter?.let { "$secondaryTimeZoneLabel · ${it.format(now)}" }.orEmpty(),
+            nextAlarmDisplayText.takeIf { nextAlarmTriggerMillis?.let { trigger -> trigger > now.time } == true }.orEmpty(),
         )
     }
 
-    private fun refreshClockFormatters() {
+    private fun refreshClockFormatters(appearance: AppearanceConfig) {
         timeFormatter = DateFormat.getTimeInstance(DateFormat.SHORT)
         dateFormatter = DateFormat.getDateInstance(DateFormat.FULL)
         clockCalendar.timeZone = timeFormatter.timeZone
+        val secondaryZone = appearance.secondaryTimeZoneId
+        secondaryTimeFormatter = secondaryZone?.let {
+            DateFormat.getTimeInstance(DateFormat.SHORT).apply { timeZone = TimeZone.getTimeZone(it) }
+        }
+        secondaryTimeZoneLabel = secondaryZone?.substringAfterLast('/')?.replace('_', ' ').orEmpty()
         displayedDay = Int.MIN_VALUE
+    }
+
+    private fun refreshNextAlarm(appearance: AppearanceConfig) {
+        nextAlarmTriggerMillis = if (appearance.showNextAlarm) {
+            getSystemService(AlarmManager::class.java).nextAlarmClock?.triggerTime
+        } else null
+        nextAlarmDisplayText = nextAlarmTriggerMillis?.let {
+            getString(
+                R.string.next_alarm_value,
+                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it)),
+            )
+        }.orEmpty()
     }
 
     private fun scheduleNextMinute() {

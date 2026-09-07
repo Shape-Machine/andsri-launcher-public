@@ -31,4 +31,6 @@ data class AppearanceConfig(
     val iconTheme: IconTheme = IconTheme.ARCTICONS,
     val appearanceMode: AppearanceMode = AppearanceMode.SYSTEM,
     val clockPreset: ClockPreset = ClockPreset.STANDARD,
+    val showNextAlarm: Boolean = false,
+    val secondaryTimeZoneId: String? = null,
 )
