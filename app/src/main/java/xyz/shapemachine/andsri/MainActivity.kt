@@ -65,8 +65,9 @@ class MainActivity : Activity() {
     @Volatile private var displayedWallpaper: String? = null
     private lateinit var timeFormatter: DateFormat
     private lateinit var dateFormatter: DateFormat
-    private var secondaryTimeFormatter: DateFormat? = null
-    private var secondaryTimeZoneLabel = ""
+    private var additionalTimeNames: List<String> = emptyList()
+    private var additionalTimeFormatters: List<DateFormat> = emptyList()
+    private var additionalTimeValues: Array<String> = emptyArray()
     private var nextAlarmTriggerMillis: Long? = null
     private var nextAlarmDisplayText = ""
     private val clockCalendar = Calendar.getInstance()
@@ -412,10 +413,14 @@ class MainActivity : Activity() {
             displayedDay = day
             displayedDate = dateFormatter.format(now)
         }
+        additionalTimeFormatters.forEachIndexed { index, formatter ->
+            additionalTimeValues[index] = formatter.format(now)
+        }
         adapter.updateClock(
             timeFormatter.format(now),
             displayedDate,
-            secondaryTimeFormatter?.let { "$secondaryTimeZoneLabel · ${it.format(now)}" }.orEmpty(),
+            additionalTimeNames,
+            additionalTimeValues,
             nextAlarmDisplayText.takeIf { nextAlarmTriggerMillis?.let { trigger -> trigger > now.time } == true }.orEmpty(),
         )
     }
@@ -424,11 +429,13 @@ class MainActivity : Activity() {
         timeFormatter = DateFormat.getTimeInstance(DateFormat.SHORT)
         dateFormatter = DateFormat.getDateInstance(DateFormat.FULL)
         clockCalendar.timeZone = timeFormatter.timeZone
-        val secondaryZone = appearance.secondaryTimeZoneId
-        secondaryTimeFormatter = secondaryZone?.let {
-            DateFormat.getTimeInstance(DateFormat.SHORT).apply { timeZone = TimeZone.getTimeZone(it) }
+        additionalTimeNames = appearance.additionalTimeZones.map(AdditionalTimeZone::locationName)
+        additionalTimeFormatters = appearance.additionalTimeZones.map {
+            DateFormat.getTimeInstance(DateFormat.SHORT).apply {
+                timeZone = TimeZone.getTimeZone(it.timeZoneId)
+            }
         }
-        secondaryTimeZoneLabel = secondaryZone?.substringAfterLast('/')?.replace('_', ' ').orEmpty()
+        additionalTimeValues = Array(additionalTimeFormatters.size) { "" }
         displayedDay = Int.MIN_VALUE
     }
 

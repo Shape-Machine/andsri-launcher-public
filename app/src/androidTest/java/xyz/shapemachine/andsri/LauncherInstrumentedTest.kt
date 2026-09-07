@@ -58,7 +58,11 @@ class LauncherInstrumentedTest {
             font = FontPreset.MONOSPACE,
             appearanceMode = AppearanceMode.DARK,
             showNextAlarm = true,
-            secondaryTimeZoneId = "Asia/Kolkata",
+            additionalTimeZones = listOf(
+                AdditionalTimeZone("Kolkata", "Asia/Kolkata"),
+                AdditionalTimeZone("Amsterdam", "Europe/Amsterdam"),
+                AdditionalTimeZone("New York", "America/New_York"),
+            ),
         ))
         preferences.saveWeather(WeatherConfig(WeatherLocation("Amsterdam", 52.37, 4.89), WeatherPreset.COMPACT, TemperatureUnit.CELSIUS))
         preferences.setAppsExpanded(true)
@@ -68,7 +72,8 @@ class LauncherInstrumentedTest {
         assertTrue(preferences.customLabels()["one/component"] == "Renamed")
         assertTrue(preferences.appearance().font == FontPreset.MONOSPACE)
         assertTrue(preferences.appearance().showNextAlarm)
-        assertTrue(preferences.appearance().secondaryTimeZoneId == "Asia/Kolkata")
+        assertTrue(preferences.appearance().additionalTimeZones.size == 3)
+        assertTrue(preferences.appearance().additionalTimeZones.first().timeZoneId == "Asia/Kolkata")
         assertTrue(preferences.weather().location?.name == "Amsterdam")
         assertTrue(preferences.weather().preset == WeatherPreset.COMPACT)
         assertTrue(preferences.appsExpanded())

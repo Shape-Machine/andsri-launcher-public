@@ -31,9 +31,7 @@ class LauncherPreferences(context: Context) {
         appearanceMode = enumValue(KEY_APPEARANCE_MODE, AppearanceMode.SYSTEM),
         clockPreset = enumValue(KEY_CLOCK_PRESET, ClockPreset.STANDARD),
         showNextAlarm = preferences.getBoolean(KEY_SHOW_NEXT_ALARM, false),
-        secondaryTimeZoneId = preferences.getString(KEY_SECONDARY_TIME_ZONE, null)?.takeIf {
-            runCatching { java.time.ZoneId.of(it) }.isSuccess
-        },
+        additionalTimeZones = additionalTimeZones(),
     )
 
     fun weather() = WeatherConfig(
@@ -93,8 +91,11 @@ class LauncherPreferences(context: Context) {
             .putString(KEY_APPEARANCE_MODE, value.appearanceMode.name)
             .putString(KEY_CLOCK_PRESET, value.clockPreset.name)
             .putBoolean(KEY_SHOW_NEXT_ALARM, value.showNextAlarm)
-        value.secondaryTimeZoneId?.let { editor.putString(KEY_SECONDARY_TIME_ZONE, it) }
-            ?: editor.remove(KEY_SECONDARY_TIME_ZONE)
+        editor.putString(KEY_ADDITIONAL_TIME_ZONES, JSONArray().apply {
+            value.additionalTimeZones.take(MAX_ADDITIONAL_TIME_ZONES).forEach {
+                put(JSONObject().put("name", it.locationName).put("zone", it.timeZoneId))
+            }
+        }.toString()).remove(KEY_SECONDARY_TIME_ZONE)
         editor.apply()
     }
 
@@ -133,6 +134,27 @@ class LauncherPreferences(context: Context) {
     private inline fun <reified T : Enum<T>> enumValue(key: String, default: T): T =
         runCatching { enumValueOf<T>(preferences.getString(key, default.name) ?: default.name) }.getOrDefault(default)
 
+    private fun additionalTimeZones(): List<AdditionalTimeZone> {
+        val stored = runCatching {
+            val raw = preferences.getString(KEY_ADDITIONAL_TIME_ZONES, null) ?: return@runCatching emptyList()
+            val array = JSONArray(raw)
+            buildList {
+                for (index in 0 until minOf(array.length(), MAX_ADDITIONAL_TIME_ZONES)) {
+                    val value = array.getJSONObject(index)
+                    val name = value.getString("name").trim()
+                    val zone = value.getString("zone")
+                    if (name.isNotBlank() && runCatching { java.time.ZoneId.of(zone) }.isSuccess) {
+                        add(AdditionalTimeZone(name, zone))
+                    }
+                }
+            }
+        }.getOrDefault(emptyList())
+        if (stored.isNotEmpty()) return stored
+        return preferences.getString(KEY_SECONDARY_TIME_ZONE, null)?.takeIf {
+            runCatching { java.time.ZoneId.of(it) }.isSuccess
+        }?.let { listOf(AdditionalTimeZone(it.substringAfterLast('/').replace('_', ' '), it)) }.orEmpty()
+    }
+
     companion object {
         private const val FILE_NAME = "launcher_preferences"
         internal const val KEY_HIDDEN = "hidden_components"
@@ -155,6 +177,8 @@ class LauncherPreferences(context: Context) {
         private const val KEY_APPEARANCE_MODE = "appearance_mode"
         private const val KEY_CLOCK_PRESET = "clock_preset"
         internal const val KEY_SHOW_NEXT_ALARM = "show_next_alarm"
-        internal const val KEY_SECONDARY_TIME_ZONE = "secondary_time_zone"
+        private const val KEY_SECONDARY_TIME_ZONE = "secondary_time_zone"
+        internal const val KEY_ADDITIONAL_TIME_ZONES = "additional_time_zones"
+        private const val MAX_ADDITIONAL_TIME_ZONES = 3
     }
 }

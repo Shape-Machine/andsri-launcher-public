@@ -38,7 +38,8 @@ class LauncherAdapter(
     private var appearance = AppearanceConfig()
     private var timeText = ""
     private var dateText = ""
-    private var secondaryTimeText = ""
+    private var additionalTimeNames: List<String> = emptyList()
+    private var additionalTimeValues: Array<String> = emptyArray()
     private var nextAlarmText = ""
     private var textColor = Color.WHITE
     private var weatherConfig = WeatherConfig()
@@ -47,7 +48,7 @@ class LauncherAdapter(
     private var weatherError: String? = null
     private var boundTimeView: TextView? = null
     private var boundDateView: TextView? = null
-    private var boundSecondaryTimeView: TextView? = null
+    private var boundAdditionalTimeView: LinearLayout? = null
     private var boundNextAlarmView: TextView? = null
     private var boundWeatherView: LinearLayout? = null
     private val iconProvider = BundledIconProvider(context)
@@ -125,17 +126,21 @@ class LauncherAdapter(
         boundWeatherView?.let(::bindWeather)
     }
 
-    fun updateClock(time: String, date: String, secondaryTime: String, nextAlarm: String) {
+    fun updateClock(
+        time: String,
+        date: String,
+        updatedAdditionalTimeNames: List<String>,
+        updatedAdditionalTimeValues: Array<String>,
+        nextAlarm: String,
+    ) {
         timeText = time
         dateText = date
-        secondaryTimeText = secondaryTime
+        additionalTimeNames = updatedAdditionalTimeNames
+        additionalTimeValues = updatedAdditionalTimeValues
         nextAlarmText = nextAlarm
         boundTimeView?.text = time
         boundDateView?.text = date
-        boundSecondaryTimeView?.apply {
-            text = secondaryTime
-            visibility = if (secondaryTime.isBlank()) View.GONE else View.VISIBLE
-        }
+        boundAdditionalTimeView?.let { bindAdditionalTimes(it, applyStyle = false) }
         boundNextAlarmView?.apply {
             text = nextAlarm
             visibility = if (nextAlarm.isBlank()) View.GONE else View.VISIBLE
@@ -426,7 +431,13 @@ class LauncherAdapter(
                 }, LinearLayout.LayoutParams(dp(48), dp(48)))
             })
             addView(label(17f).apply { id = DATE_ID; gravity = Gravity.CENTER; maxLines = 2; layoutParams = LinearLayout.LayoutParams(-1, -2); setPadding(0, dp(6), 0, 0) })
-            addView(label(15f).apply { id = SECONDARY_TIME_ID; gravity = Gravity.CENTER; maxLines = 1; setPadding(0, dp(4), 0, 0) })
+            addView(LinearLayout(context).apply {
+                id = SECONDARY_TIME_ID
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                layoutParams = LinearLayout.LayoutParams(-1, -2)
+                setPadding(0, dp(4), 0, 0)
+            })
             addView(label(14f).apply {
                 id = NEXT_ALARM_ID
                 gravity = Gravity.CENTER
@@ -450,12 +461,9 @@ class LauncherAdapter(
         }
         container.findViewById<ImageButton>(SETTINGS_ID).drawable?.setTint(textColor)
         container.findViewById<TextView>(DATE_ID).apply { boundDateView = this; text = dateText; textSize = sizes.second; setTextColor(textColor); typeface = font(); setOnClickListener { onDateClick() } }
-        container.findViewById<TextView>(SECONDARY_TIME_ID).apply {
-            boundSecondaryTimeView = this
-            text = secondaryTimeText
-            visibility = if (secondaryTimeText.isBlank()) View.GONE else View.VISIBLE
-            setTextColor(textColor)
-            typeface = font()
+        container.findViewById<LinearLayout>(SECONDARY_TIME_ID).apply {
+            boundAdditionalTimeView = this
+            bindAdditionalTimes(this, applyStyle = true)
         }
         container.findViewById<TextView>(NEXT_ALARM_ID).apply {
             boundNextAlarmView = this
@@ -466,6 +474,52 @@ class LauncherAdapter(
             setOnClickListener { onClockClick() }
         }
         return container
+    }
+
+    private fun bindAdditionalTimes(container: LinearLayout, applyStyle: Boolean) {
+        container.visibility = if (additionalTimeNames.isEmpty()) View.GONE else View.VISIBLE
+        while (container.childCount > additionalTimeNames.size) {
+            container.removeViewAt(container.childCount - 1)
+        }
+        while (container.childCount < additionalTimeNames.size) {
+            container.addView(additionalTimeCell(), LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        val currentFont = if (applyStyle) font() else null
+        additionalTimeNames.forEachIndexed { index, name ->
+            val cell = container.getChildAt(index) as LinearLayout
+            (cell.getChildAt(0) as TextView).apply {
+                if (text.toString() != name) text = name
+                if (applyStyle) {
+                    setTextColor(textColor)
+                    typeface = currentFont
+                }
+            }
+            (cell.getChildAt(1) as TextView).apply {
+                val value = additionalTimeValues[index]
+                if (text.toString() != value) text = value
+                if (applyStyle) {
+                    setTextColor(textColor)
+                    typeface = currentFont
+                }
+            }
+        }
+    }
+
+    private fun additionalTimeCell() = LinearLayout(context).apply {
+        val cellFont = font()
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        addView(label(13f).apply {
+            gravity = Gravity.CENTER
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            typeface = cellFont
+        })
+        addView(label(15f).apply {
+            gravity = Gravity.CENTER
+            maxLines = 1
+            typeface = cellFont
+        })
     }
 
     private fun appView(row: HomeRow.App, recycled: View?): View {

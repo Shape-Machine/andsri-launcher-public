@@ -204,7 +204,12 @@ class OpenMeteoClient {
                         value.optString("admin1").takeIf(String::isNotBlank),
                         value.optString("country").takeIf(String::isNotBlank),
                     ).distinct().joinToString(", ")
-                    if (name.isNotBlank()) add(WeatherLocation(name, value.getDouble("latitude"), value.getDouble("longitude")))
+                    val timeZoneId = value.optString("timezone").takeIf { id ->
+                        id.isNotBlank() && runCatching { java.time.ZoneId.of(id) }.isSuccess
+                    }
+                    if (name.isNotBlank()) add(
+                        WeatherLocation(name, value.getDouble("latitude"), value.getDouble("longitude"), timeZoneId),
+                    )
                 }
             }
         }

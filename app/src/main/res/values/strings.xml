@@ -82,7 +82,9 @@
     <string name="solid_background">Solid background</string>
     <string name="show_next_alarm">Show next alarm</string>
     <string name="next_alarm_value">Alarm · %1$s</string>
-    <string name="secondary_time_zone">Second timezone</string>
+    <string name="additional_time_zone">Additional timezone</string>
+    <string name="additional_time_zone_number">Additional timezone %1$d</string>
+    <string name="add_time_zone">Add timezone</string>
     <string name="option_off">Off</string>
     <string name="general">GENERAL</string>
     <string name="language">Language</string>

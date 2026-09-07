@@ -140,11 +140,16 @@ class SettingsActivity : Activity() {
             switchControl(R.string.show_next_alarm, appearance.showNextAlarm) {
                 preferences.saveAppearance(preferences.appearance().copy(showNextAlarm = it))
             }
-            action(
-                R.string.secondary_time_zone,
-                ::chooseSecondaryTimeZone,
-                appearance.secondaryTimeZoneId?.let(::timeZoneLabel) ?: getString(R.string.option_off),
-            )
+            appearance.additionalTimeZones.forEachIndexed { index, zone ->
+                action(
+                    getString(R.string.additional_time_zone_number, index + 1),
+                    { editAdditionalTimeZone(index) },
+                    zone.locationName,
+                )
+            }
+            if (appearance.additionalTimeZones.size < MAX_ADDITIONAL_TIME_ZONES) {
+                action(R.string.add_time_zone, { editAdditionalTimeZone(appearance.additionalTimeZones.size) })
+            }
             enumControl(R.string.list_density, DensityPreset.entries, appearance.density) {
                 preferences.saveAppearance(preferences.appearance().copy(density = it)); recreate()
             }
@@ -187,6 +192,19 @@ class SettingsActivity : Activity() {
 
     private fun LinearLayout.action(label: Int, action: () -> Unit, value: String? = null) = addView(TextView(context).apply {
         text = if (value == null) getString(label) else "${getString(label)}\n$value"
+        textSize = 18f; setTextColor(foregroundColor); gravity = Gravity.CENTER_VERTICAL
+        typeface = settingsTypeface
+        val vertical = when (appearance.density) {
+            DensityPreset.COMPACT -> 12
+            DensityPreset.STANDARD -> 17
+            DensityPreset.COMFORTABLE -> 22
+        }
+        setPadding(dp(4), dp(vertical), dp(4), dp(vertical)); isHapticFeedbackEnabled = true
+        setOnClickListener { it.performHapticFeedback(0); action() }
+    })
+
+    private fun LinearLayout.action(label: String, action: () -> Unit, value: String? = null) = addView(TextView(context).apply {
+        text = if (value == null) label else "$label\n$value"
         textSize = 18f; setTextColor(foregroundColor); gravity = Gravity.CENTER_VERTICAL
         typeface = settingsTypeface
         val vertical = when (appearance.density) {
@@ -571,20 +589,33 @@ class SettingsActivity : Activity() {
         else -> error("Missing label for $value")
     })
 
-    private fun editWeatherLocation() {
+    private fun editWeatherLocation() = editLocation(
+        title = R.string.weather_location,
+        currentName = preferences.weather().location?.name,
+        onLocations = ::chooseWeatherLocation,
+    )
+
+    private fun editLocation(
+        title: Int,
+        currentName: String?,
+        filter: (WeatherLocation) -> Boolean = { true },
+        onClear: (() -> Unit)? = null,
+        onLocations: (List<WeatherLocation>) -> Unit,
+    ) {
         val input = EditText(this).apply {
-            setText(preferences.weather().location?.name.orEmpty())
+            setText(currentName.orEmpty())
             hint = getString(R.string.weather_location_hint)
             setSingleLine(true)
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS
             setPadding(dp(20), dp(12), dp(20), dp(12))
         }
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(R.string.weather_location)
+        val builder = AlertDialog.Builder(this)
+            .setTitle(title)
             .setView(input)
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.find_location, null)
-            .create()
+        if (onClear != null) builder.setNeutralButton(R.string.option_off) { _, _ -> onClear() }
+        val dialog = builder.create()
         var completed = false
         dialog.setOnDismissListener {
             if (!completed) {
@@ -604,16 +635,16 @@ class SettingsActivity : Activity() {
                         weatherClient.resolveLocation(
                             query,
                             resources.configuration.locales[0].language.ifBlank { "en" },
-                        )
+                        ).filter(filter)
                     }
                     mainExecutor.execute {
                         if (isDestroyed || !dialog.isShowing || !locationRequestGate.finish(requestToken)) return@execute
                         completed = true
                         dialog.dismiss()
-                        result.getOrNull()?.takeIf { it.isNotEmpty() }?.let(::chooseWeatherLocation)
+                        result.getOrNull()?.takeIf { it.isNotEmpty() }?.let(onLocations)
                             ?: Toast.makeText(this, R.string.location_not_found, Toast.LENGTH_LONG).show()
                     }
-                }, "andSri-weather-location").start()
+                }, "andSri-location-search").start()
             }
         }
         dialog.show()
@@ -656,39 +687,36 @@ class SettingsActivity : Activity() {
 
     private fun openHomeSettings() = startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
 
-    private fun chooseSecondaryTimeZone() {
-        val labels = listOf(getString(R.string.option_off), "UTC") + TIME_ZONE_REGIONS
-        AlertDialog.Builder(this).setTitle(R.string.secondary_time_zone)
-            .setItems(labels.toTypedArray()) { _, index ->
-                when (index) {
-                    0 -> saveSecondaryTimeZone(null)
-                    1 -> saveSecondaryTimeZone("UTC")
-                    else -> chooseSecondaryTimeZoneInRegion(TIME_ZONE_REGIONS[index - 2])
-                }
+    private fun editAdditionalTimeZone(index: Int) = editLocation(
+        title = R.string.additional_time_zone,
+        currentName = preferences.appearance().additionalTimeZones.getOrNull(index)?.locationName,
+        filter = { it.timeZoneId != null },
+        onClear = { saveAdditionalTimeZone(index, null) },
+        onLocations = { chooseAdditionalTimeZone(index, it) },
+    )
+
+    private fun chooseAdditionalTimeZone(index: Int, locations: List<WeatherLocation>) {
+        AlertDialog.Builder(this).setTitle(R.string.choose_location)
+            .setItems(locations.map { it.name }.toTypedArray()) { _, selected ->
+                val location = locations[selected]
+                saveAdditionalTimeZone(
+                    index,
+                    AdditionalTimeZone(location.name.substringBefore(',').trim(), requireNotNull(location.timeZoneId)),
+                )
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
     }
 
-    private fun chooseSecondaryTimeZoneInRegion(region: String) {
-        val zones = java.time.ZoneId.getAvailableZoneIds().asSequence()
-            .filter { it.startsWith("$region/") }
-            .sorted()
-            .toList()
-        AlertDialog.Builder(this).setTitle(region)
-            .setItems(zones.map { it.substringAfter('/').replace('_', ' ') }.toTypedArray()) { _, index ->
-                saveSecondaryTimeZone(zones[index])
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
-    }
-
-    private fun saveSecondaryTimeZone(id: String?) {
-        preferences.saveAppearance(preferences.appearance().copy(secondaryTimeZoneId = id))
+    private fun saveAdditionalTimeZone(index: Int, value: AdditionalTimeZone?) {
+        val appearance = preferences.appearance()
+        val zones = appearance.additionalTimeZones.toMutableList()
+        if (value == null) {
+            if (index < zones.size) zones.removeAt(index)
+        } else if (index < zones.size) zones[index] = value else zones.add(value)
+        preferences.saveAppearance(appearance.copy(additionalTimeZones = zones.take(MAX_ADDITIONAL_TIME_ZONES)))
         recreate()
     }
-
-    private fun timeZoneLabel(id: String) = id.replace('_', ' ')
 
     private fun showLicenses() {
         val files = assets.list("licenses").orEmpty().sorted()
@@ -729,8 +757,6 @@ class SettingsActivity : Activity() {
     companion object {
         private const val WALLPAPER_REQUEST = 41
         private const val STATUS_BAR_ID = 3001
-        private val TIME_ZONE_REGIONS = listOf(
-            "Africa", "America", "Antarctica", "Arctic", "Asia", "Atlantic", "Australia", "Europe", "Indian", "Pacific",
-        )
+        private const val MAX_ADDITIONAL_TIME_ZONES = 3
     }
 }

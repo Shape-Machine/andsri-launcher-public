@@ -13,7 +13,10 @@ data class WeatherLocation(
     val name: String,
     val latitude: Double,
     val longitude: Double,
+    val timeZoneId: String? = null,
 )
+
+data class AdditionalTimeZone(val locationName: String, val timeZoneId: String)
 
 data class WeatherConfig(
     val location: WeatherLocation? = null,
@@ -32,5 +35,5 @@ data class AppearanceConfig(
     val appearanceMode: AppearanceMode = AppearanceMode.SYSTEM,
     val clockPreset: ClockPreset = ClockPreset.STANDARD,
     val showNextAlarm: Boolean = false,
-    val secondaryTimeZoneId: String? = null,
+    val additionalTimeZones: List<AdditionalTimeZone> = emptyList(),
 )

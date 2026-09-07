@@ -47,11 +47,11 @@ class WeatherDataTest {
     @Test
     fun parsesOnlyRequiredLocationFields() {
         val locations = OpenMeteoClient.parseLocations(
-            """{"results":[{"name":"Amsterdam","latitude":52.37,"longitude":4.89,"country":"Netherlands","admin1":"North Holland"}]}""",
+            """{"results":[{"name":"Amsterdam","latitude":52.37,"longitude":4.89,"country":"Netherlands","admin1":"North Holland","timezone":"Europe/Amsterdam"}]}""",
         )
 
         assertEquals(
-            listOf(WeatherLocation("Amsterdam, North Holland, Netherlands", 52.37, 4.89)),
+            listOf(WeatherLocation("Amsterdam, North Holland, Netherlands", 52.37, 4.89, "Europe/Amsterdam")),
             locations,
         )
     }
