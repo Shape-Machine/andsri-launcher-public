@@ -28,14 +28,14 @@ Requires Android 13+. Android may request permission to install the APK. Release
 - **Focus:** no search, suggestions, badges, feeds, widgets, or custom animation.
 - **Efficiency:** no telemetry, analytics, polling, background services, scheduled work, or idle networking.
 - **Predictability:** favorites and the alphabetical app list share one vertical screen.
-- **Privacy:** weather is user-triggered; hidden apps require device authentication.
+- **Privacy:** current and 12-hour forecast weather is user-triggered; hidden apps require device authentication.
 - **Durability:** Kotlin, classic Android Views, platform APIs, zero production runtime dependencies.
 
 ## Benefits
 
 - Fewer steps from Home to app.
 - Exceptionally low idle battery, CPU, memory, and network use.
-- Configurable icons, typography, density, wallpaper, and appearance.
+- Configurable icons, typography, density, wallpaper, appearance, and efficient cached weather forecasts.
 - Fast favorites plus a complete alphabetical list.
 - English, Dutch, and Hindi; Android-managed configuration backup.
 

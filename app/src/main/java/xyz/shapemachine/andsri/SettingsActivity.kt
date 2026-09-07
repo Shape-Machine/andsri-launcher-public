@@ -556,6 +556,7 @@ class SettingsActivity : Activity() {
         WeatherPreset.COMPACT -> R.string.option_compact
         WeatherPreset.STANDARD -> R.string.option_standard
         WeatherPreset.EMPHASIZED -> R.string.option_emphasized
+        WeatherPreset.FORECAST -> R.string.option_forecast
         TemperatureUnit.SYSTEM -> R.string.option_system
         TemperatureUnit.CELSIUS -> R.string.option_celsius
         TemperatureUnit.FAHRENHEIT -> R.string.option_fahrenheit

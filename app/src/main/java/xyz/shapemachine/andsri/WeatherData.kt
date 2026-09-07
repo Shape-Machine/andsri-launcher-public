@@ -1,6 +1,7 @@
 package xyz.shapemachine.andsri
 
 import android.content.Context
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
@@ -11,12 +12,21 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.roundToInt
 
+private const val FORECAST_HOURS = 12
+
 data class WeatherSnapshot(
     val locationName: String,
     val temperature: Double,
     val weatherCode: Int,
     val fetchedAtMillis: Long,
     val unit: TemperatureUnit,
+    val forecast: List<ForecastHour> = emptyList(),
+)
+
+data class ForecastHour(
+    val temperature: Double,
+    val weatherCode: Int,
+    val precipitationProbability: Int,
 )
 
 class RequestGate {
@@ -57,6 +67,7 @@ class WeatherCache(context: Context) {
                 preferences.getInt(KEY_CODE, -1).also { require(it >= 0) },
                 preferences.getLong(KEY_FETCHED_AT, 0L).also { require(it > 0L) },
                 config.unit,
+                parseForecast(preferences.getString(KEY_FORECAST, null)),
             )
         }.getOrNull()
     }
@@ -68,12 +79,29 @@ class WeatherCache(context: Context) {
             .putLong(KEY_TEMPERATURE, java.lang.Double.doubleToRawLongBits(snapshot.temperature))
             .putInt(KEY_CODE, snapshot.weatherCode)
             .putLong(KEY_FETCHED_AT, snapshot.fetchedAtMillis)
+            .putString(KEY_FORECAST, serializeForecast(snapshot.forecast))
             .apply()
     }
 
     fun clear() = preferences.edit().clear().apply()
 
     private fun locationKey(location: WeatherLocation) = "${location.latitude},${location.longitude}"
+
+    private fun serializeForecast(forecast: List<ForecastHour>) = JSONArray().apply {
+        forecast.take(FORECAST_HOURS).forEach { hour ->
+            put(JSONArray().put(hour.temperature).put(hour.weatherCode).put(hour.precipitationProbability))
+        }
+    }.toString()
+
+    private fun parseForecast(value: String?): List<ForecastHour> = runCatching {
+        val array = JSONArray(value ?: return emptyList())
+        buildList {
+            for (index in 0 until minOf(array.length(), FORECAST_HOURS)) {
+                val hour = array.getJSONArray(index)
+                add(ForecastHour(hour.getDouble(0), hour.getInt(1), hour.getInt(2).coerceIn(0, 100)))
+            }
+        }
+    }.getOrDefault(emptyList())
 
     private companion object {
         const val FILE_NAME = "weather_cache"
@@ -82,6 +110,7 @@ class WeatherCache(context: Context) {
         const val KEY_TEMPERATURE = "temperature"
         const val KEY_CODE = "code"
         const val KEY_FETCHED_AT = "fetched_at"
+        const val KEY_FORECAST = "forecast"
     }
 }
 
@@ -98,10 +127,16 @@ class OpenMeteoClient {
         val location = requireNotNull(config.location)
         val resolvedUnit = resolveUnit(config.unit)
         val unitParameter = if (resolvedUnit == TemperatureUnit.FAHRENHEIT) "fahrenheit" else "celsius"
+        val forecastParameters = if (config.preset == WeatherPreset.FORECAST) {
+            "&hourly=temperature_2m,weather_code,precipitation_probability&forecast_hours=13&timezone=auto"
+        } else {
+            "&forecast_days=1"
+        }
         val json = request(
             "https://api.open-meteo.com/v1/forecast" +
                 "?latitude=${location.latitude}&longitude=${location.longitude}" +
-                "&current=temperature_2m,weather_code&temperature_unit=$unitParameter&forecast_days=1",
+                "&current=temperature_2m,weather_code" +
+                "&temperature_unit=$unitParameter$forecastParameters",
         )
         return parseWeather(json, location.name, resolvedUnit, System.currentTimeMillis())
     }
@@ -181,12 +216,40 @@ class OpenMeteoClient {
             fetchedAtMillis: Long,
         ): WeatherSnapshot {
             val current = JSONObject(json).getJSONObject("current")
+            val hourly = JSONObject(json).optJSONObject("hourly")
+            val times = hourly?.optJSONArray("time")
+            val temperatures = hourly?.optJSONArray("temperature_2m")
+            val codes = hourly?.optJSONArray("weather_code")
+            val precipitation = hourly?.optJSONArray("precipitation_probability")
+            val availableCount = minOf(
+                times?.length() ?: 0,
+                temperatures?.length() ?: 0,
+                codes?.length() ?: 0,
+                precipitation?.length() ?: 0,
+            )
+            val currentTime = current.optString("time")
+            val firstFutureIndex = (0 until availableCount).firstOrNull {
+                currentTime.isBlank() || times!!.getString(it) > currentTime
+            } ?: availableCount
+            val forecastCount = minOf(availableCount - firstFutureIndex, FORECAST_HOURS)
             return WeatherSnapshot(
                 locationName,
                 current.getDouble("temperature_2m"),
                 current.getInt("weather_code"),
                 fetchedAtMillis,
                 unit,
+                buildList {
+                    for (offset in 0 until forecastCount) {
+                        val index = firstFutureIndex + offset
+                        add(
+                            ForecastHour(
+                                temperatures!!.getDouble(index),
+                                codes!!.getInt(index),
+                                precipitation!!.getInt(index).coerceIn(0, 100),
+                            ),
+                        )
+                    }
+                },
             )
         }
 

@@ -74,6 +74,22 @@ class WeatherDataTest {
     }
 
     @Test
+    fun parsesAndBoundsHourlyForecast() {
+        val hourlyValues = (0 until 14).joinToString(",")
+        val hourlyTimes = (0 until 14).joinToString(",") { "\"2026-09-07T${it.toString().padStart(2, '0')}:00\"" }
+        val snapshot = OpenMeteoClient.parseWeather(
+            """{"current":{"time":"2026-09-07T00:15","temperature_2m":18.4,"weather_code":2},"hourly":{"time":[$hourlyTimes],"temperature_2m":[$hourlyValues],"weather_code":[$hourlyValues],"precipitation_probability":[${(0 until 14).joinToString(",") { (it * 10).toString() }}]}}""",
+            "Amsterdam",
+            TemperatureUnit.CELSIUS,
+            1234L,
+        )
+
+        assertEquals(12, snapshot.forecast.size)
+        assertEquals(ForecastHour(1.0, 1, 10), snapshot.forecast.first())
+        assertEquals(ForecastHour(12.0, 12, 100), snapshot.forecast.last())
+    }
+
+    @Test
     fun systemUnitFollowsLocaleMeasurementConvention() {
         assertEquals(TemperatureUnit.FAHRENHEIT, OpenMeteoClient.resolveUnit(TemperatureUnit.SYSTEM, Locale.US))
         val dutch = Locale.Builder().setLanguage("nl").setRegion("NL").build()

@@ -6,7 +6,7 @@ enum class DensityPreset { COMPACT, STANDARD, COMFORTABLE }
 enum class IconTheme { NORMAL, LAWNICONS, ARCTICONS, APPSTRACT, CUSCON, DELTA, DOLLPHONE, SNOW }
 enum class AppearanceMode { SYSTEM, LIGHT, DARK }
 enum class ClockPreset { COMPACT, STANDARD, EMPHASIZED }
-enum class WeatherPreset { COMPACT, STANDARD, EMPHASIZED }
+enum class WeatherPreset { COMPACT, STANDARD, EMPHASIZED, FORECAST }
 enum class TemperatureUnit { SYSTEM, CELSIUS, FAHRENHEIT }
 
 data class WeatherLocation(

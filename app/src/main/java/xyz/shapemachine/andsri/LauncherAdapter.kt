@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
+import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -17,6 +18,7 @@ import android.widget.TextView
 import android.util.LruCache
 import android.util.TypedValue
 import java.util.concurrent.Executors
+import kotlin.math.roundToInt
 
 class LauncherAdapter(
     private val context: Context,
@@ -181,6 +183,11 @@ class LauncherAdapter(
                     setOnClickListener { onWeatherAttribution() }
                 })
             })
+            addView(label(15f).apply {
+                id = WEATHER_TERTIARY_ID
+                gravity = Gravity.CENTER
+                maxLines = 2
+            })
             setOnClickListener { view ->
                 if (!weatherRefreshing) {
                     view.performHapticFeedback(0)
@@ -197,7 +204,14 @@ class LauncherAdapter(
         val primary = container.findViewById<TextView>(WEATHER_PRIMARY_ID)
         val secondary = container.findViewById<TextView>(WEATHER_SECONDARY_ID)
         val attribution = container.findViewById<TextView>(WEATHER_ATTRIBUTION_ID)
+        val tertiary = container.findViewById<TextView>(WEATHER_TERTIARY_ID)
         val snapshot = weatherSnapshot
+        primary.maxLines = 2
+        primary.ellipsize = null
+        secondary.maxLines = 2
+        secondary.ellipsize = null
+        tertiary.maxLines = 2
+        tertiary.ellipsize = null
         val condition = snapshot?.let { context.getString(weatherConditionLabel(it.weatherCode)) }
         val age = snapshot?.let(::weatherAge)
         val temperature = snapshot?.let {
@@ -229,7 +243,44 @@ class LauncherAdapter(
                 secondary.text = snapshot?.let { "${it.locationName} · $condition · $age" }.orEmpty()
                 container.setPadding(dp(24), dp(12), dp(24), dp(18))
             }
+            WeatherPreset.FORECAST -> {
+                primary.textSize = 21f
+                primary.maxLines = 1
+                primary.ellipsize = TextUtils.TruncateAt.END
+                secondary.maxLines = 1
+                secondary.ellipsize = TextUtils.TruncateAt.END
+                tertiary.maxLines = 1
+                tertiary.ellipsize = TextUtils.TruncateAt.END
+                primary.text = if (snapshot == null) {
+                    context.getString(R.string.weather_tap_to_check)
+                } else {
+                    "$symbol  $temperature · $condition · $age"
+                }
+                secondary.visibility = View.VISIBLE
+                attribution.visibility = View.VISIBLE
+                tertiary.visibility = View.VISIBLE
+                if (snapshot != null && snapshot.forecast.size >= 12) {
+                    secondary.text = context.getString(
+                        R.string.weather_next_four_hours,
+                        snapshot.forecast.take(4).joinToString("  ") {
+                            "${weatherSymbol(it.weatherCode)} ${it.temperature.roundToInt()}°"
+                        },
+                    )
+                    val temperatures = snapshot.forecast.map { it.temperature }
+                    tertiary.text = context.getString(
+                        R.string.weather_next_twelve_hours,
+                        temperatures.min().roundToInt(),
+                        temperatures.max().roundToInt(),
+                        snapshot.forecast.maxOf { it.precipitationProbability },
+                    )
+                } else {
+                    secondary.text = context.getString(R.string.weather_tap_for_forecast)
+                    tertiary.text = ""
+                }
+                container.setPadding(dp(24), dp(8), dp(24), dp(14))
+            }
         }
+        if (weatherConfig.preset != WeatherPreset.FORECAST) tertiary.visibility = View.GONE
         if (weatherRefreshing) {
             if (weatherConfig.preset == WeatherPreset.COMPACT) primary.text = context.getString(R.string.weather_refreshing)
             else secondary.apply { visibility = View.VISIBLE; text = context.getString(R.string.weather_refreshing) }
@@ -237,9 +288,13 @@ class LauncherAdapter(
             if (weatherConfig.preset == WeatherPreset.COMPACT) primary.text = it
             else secondary.apply { visibility = View.VISIBLE; text = it }
         }
-        listOf(primary, secondary, attribution).forEach { it.setTextColor(textColor); it.typeface = font() }
+        listOf(primary, secondary, tertiary, attribution).forEach { it.setTextColor(textColor); it.typeface = font() }
         attribution.alpha = 0.7f
-        container.contentDescription = listOfNotNull(primary.text, secondary.text.takeIf { secondary.visibility == View.VISIBLE }).joinToString(". ")
+        container.contentDescription = listOfNotNull(
+            primary.text,
+            secondary.text.takeIf { secondary.visibility == View.VISIBLE },
+            tertiary.text.takeIf { tertiary.visibility == View.VISIBLE && it.isNotBlank() },
+        ).joinToString(". ")
     }
 
     private fun appsToggleView(expanded: Boolean, recycled: View?): View = (recycled as? TextView ?: label(22f)).apply {
@@ -486,6 +541,7 @@ class LauncherAdapter(
         private const val WEATHER_PRIMARY_ID = 1004
         private const val WEATHER_SECONDARY_ID = 1005
         private const val WEATHER_ATTRIBUTION_ID = 1006
+        private const val WEATHER_TERTIARY_ID = 1007
         private const val SECTION_GAP_DP = 24
     }
 

@@ -70,7 +70,7 @@ class MainActivity : Activity() {
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == null || key == LauncherPreferences.KEY_WEATHER_NAME ||
             key == LauncherPreferences.KEY_WEATHER_LATITUDE || key == LauncherPreferences.KEY_WEATHER_LONGITUDE ||
-            key == LauncherPreferences.KEY_WEATHER_UNIT
+            key == LauncherPreferences.KEY_WEATHER_UNIT || key == LauncherPreferences.KEY_WEATHER_PRESET
         ) {
             weatherRequestGate.invalidate()
             weatherClient.cancel()

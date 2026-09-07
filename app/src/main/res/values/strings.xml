@@ -41,6 +41,9 @@
     <string name="weather_tap_to_check">Tap to check weather</string>
     <string name="weather_refreshing">Checking weather…</string>
     <string name="weather_refresh_failed">Could not refresh · tap to retry</string>
+    <string name="weather_tap_for_forecast">Tap to load forecast</string>
+    <string name="weather_next_four_hours">4h · %1$s</string>
+    <string name="weather_next_twelve_hours">12h · %1$d–%2$d° · precipitation %3$d%%</string>
     <string name="weather_updated_just_now">just now</string>
     <plurals name="weather_updated_minutes"><item quantity="one">%d minute ago</item><item quantity="other">%d minutes ago</item></plurals>
     <plurals name="weather_updated_hours"><item quantity="one">%d hour ago</item><item quantity="other">%d hours ago</item></plurals>
@@ -105,4 +108,5 @@
     <string name="option_standard">Standard</string>
     <string name="option_comfortable">Comfortable</string>
     <string name="option_emphasized">Emphasized</string>
+    <string name="option_forecast">Forecast</string>
 </resources>
