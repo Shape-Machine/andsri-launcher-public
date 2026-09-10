@@ -42,7 +42,6 @@ jp.co.sony.mc.cameraapp2	sony_photography_pro.png
 nl.nshispeed	ns.png
 nl.sportcity.android	sportcity.png
 org.fdroid.fdroid	f_droid.png
-org.futo.inputmethod.latin	futo_keyboard.png
 org.mozilla.firefox	firefox.png
 org.thoughtcrime.securesms	signal.png
 org.thunderdog.challegram	telegram.png
@@ -54,3 +53,9 @@ com.google.android.apps.adm	google_find_hub.png
 org.futo.inputmethod.latin.playstore	futo_keyboard.png
 com.opera.browser	firefox.png
 dev.anilbeesetti.nextplayer	youtube.png
+com.google.android.apps.photosgo	google_gallery.png
+com.tblenovo.center	lenovo_vantage.png
+com.tradingview.tradingviewapp	tradingview.png
+com.zui.camera	generic_camera.png
+com.zui.weather	weather.png
+org.futo.inputmethod.latin	futo_keyboard.png
