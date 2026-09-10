@@ -34,6 +34,7 @@ class LauncherAdapter(
 ) : BaseAdapter() {
     private data class CachedIcon(val state: Drawable.ConstantState, val estimatedBytes: Int)
     private data class IconKey(val component: String, val theme: IconTheme, val color: Int)
+    private data class WideControlsState(val favorites: List<AppEntry>, val appsExpanded: Boolean?)
 
     private var sourceRows: List<HomeRow> = listOf(HomeRow.Header)
     private var rows: List<HomeRow> = sourceRows
@@ -41,6 +42,8 @@ class LauncherAdapter(
     private var wideGlanceContainer: LinearLayout? = null
     private var wideControlsContainer: LinearLayout? = null
     private var wideFavoritesGrid: GridView? = null
+    private var wideAppsToggleView: View? = null
+    private var wideControlsState: WideControlsState? = null
     private var wideWeatherVisible = false
     private var appearance = AppearanceConfig()
     private var timeText = ""
@@ -142,6 +145,8 @@ class LauncherAdapter(
         wideGlanceContainer = glanceContainer
         wideControlsContainer = controlsContainer
         wideFavoritesGrid = null
+        wideAppsToggleView = null
+        wideControlsState = null
         clearBoundFixedViews()
         rows = visibleRows()
         refreshWideFixedViews(forceRebuild = true)
@@ -227,7 +232,22 @@ class LauncherAdapter(
             boundHeaderView?.let { headerView(it) }
             boundWeatherView?.let(::bindWeather)
         }
-        populateWideControls(controls)
+        val controlsState = currentWideControlsState()
+        val previousControlsState = wideControlsState
+        when {
+            forceRebuild || previousControlsState == null || controlsState.favorites != previousControlsState.favorites -> {
+                populateWideControls(controls, controlsState)
+            }
+            controlsState.appsExpanded != previousControlsState.appsExpanded -> {
+                val toggle = wideAppsToggleView
+                if (toggle != null && controlsState.appsExpanded != null) {
+                    appsToggleView(controlsState.appsExpanded, toggle)
+                    wideControlsState = controlsState
+                } else {
+                    populateWideControls(controls, controlsState)
+                }
+            }
+        }
     }
 
     private fun populateWideGlance(container: LinearLayout) {
@@ -241,11 +261,17 @@ class LauncherAdapter(
         }
     }
 
-    private fun populateWideControls(container: LinearLayout) {
+    private fun currentWideControlsState() = WideControlsState(
+        favorites = sourceRows.filterIsInstance<HomeRow.Favorites>().firstOrNull()?.apps.orEmpty(),
+        appsExpanded = sourceRows.filterIsInstance<HomeRow.AppsToggle>().firstOrNull()?.expanded,
+    )
+
+    private fun populateWideControls(container: LinearLayout, state: WideControlsState) {
         container.removeAllViews()
         wideFavoritesGrid = null
-        val favorites = sourceRows.filterIsInstance<HomeRow.Favorites>().firstOrNull()?.apps
-        if (!favorites.isNullOrEmpty()) {
+        wideAppsToggleView = null
+        wideControlsState = state
+        if (state.favorites.isNotEmpty()) {
             val grid = AdaptiveFavoritesList(context).apply {
                 isVerticalScrollBarEnabled = false
                 overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
@@ -253,13 +279,15 @@ class LauncherAdapter(
                 verticalSpacing = dp(6)
                 setPadding(dp(18), dp(8), dp(18), dp(8))
                 clipToPadding = false
-                adapter = FavoriteGridAdapter(favorites)
+                adapter = FavoriteGridAdapter(state.favorites)
             }
             wideFavoritesGrid = grid
             container.addView(grid, LinearLayout.LayoutParams(-1, dp(FAVORITE_VIEWPORT_DP)))
         }
-        sourceRows.filterIsInstance<HomeRow.AppsToggle>().firstOrNull()?.let {
-            container.addView(appsToggleView(it.expanded, null), LinearLayout.LayoutParams(-1, -2))
+        state.appsExpanded?.let {
+            val toggle = appsToggleView(it, null)
+            wideAppsToggleView = toggle
+            container.addView(toggle, LinearLayout.LayoutParams(-1, -2))
         }
     }
 
@@ -820,9 +848,15 @@ class LauncherAdapter(
     }
 
     private class AdaptiveFavoritesGrid(context: Context) : GridLayout(context) {
+        private var measuredColumns = -1
+
         override fun onMeasure(widthSpec: Int, heightSpec: Int) {
             val available = MeasureSpec.getSize(widthSpec) - paddingLeft - paddingRight
-            columnCount = LayoutPolicy.favoriteColumnCount((available / resources.displayMetrics.density).toInt())
+            val columns = LayoutPolicy.favoriteColumnCount((available / resources.displayMetrics.density).toInt())
+            if (columns != measuredColumns) {
+                measuredColumns = columns
+                columnCount = columns
+            }
             super.onMeasure(widthSpec, heightSpec)
         }
     }
@@ -841,9 +875,15 @@ class LauncherAdapter(
     }
 
     private class AdaptiveFavoritesList(context: Context) : GridView(context) {
+        private var measuredColumns = -1
+
         override fun onMeasure(widthSpec: Int, heightSpec: Int) {
             val available = MeasureSpec.getSize(widthSpec) - paddingLeft - paddingRight
-            numColumns = LayoutPolicy.favoriteColumnCount((available / resources.displayMetrics.density).toInt())
+            val columns = LayoutPolicy.favoriteColumnCount((available / resources.displayMetrics.density).toInt())
+            if (columns != measuredColumns) {
+                measuredColumns = columns
+                numColumns = columns
+            }
             super.onMeasure(widthSpec, heightSpec)
         }
     }
