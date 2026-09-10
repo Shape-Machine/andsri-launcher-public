@@ -6,6 +6,7 @@ Minimal Android launcher. One scrolling screen. No clutter. Android 13+.
 
 | Screen | Light | Dark |
 |---|---|---|
+| Tablet landscape | <img src="docs/screenshots/light-tablet-landscape.png" width="360" alt="Responsive two-column tablet home in light mode"> | <img src="docs/screenshots/dark-tablet-landscape.png" width="360" alt="Responsive two-column tablet home in dark mode"> |
 | Home, weather, next alarm | <img src="docs/screenshots/light-home-weather.png" width="210" alt="Home with weather and a humanized next alarm in light mode"> | <img src="docs/screenshots/dark-home-weather.png" width="210" alt="Home with weather and a humanized next alarm in dark mode"> |
 | Home, weather, 8 favorites | <img src="docs/screenshots/light-home-eight-favorites.png" width="210" alt="Home with weather and eight favorites in light mode"> | <img src="docs/screenshots/dark-home-eight-favorites.png" width="210" alt="Home with weather and eight favorites in dark mode"> |
 | Newsreader serif home | <img src="docs/screenshots/light-home-serif.png" width="210" alt="Home using Newsreader serif typography in light mode"> | <img src="docs/screenshots/dark-home-serif.png" width="210" alt="Home using Newsreader serif typography in dark mode"> |
@@ -27,7 +28,7 @@ Requires Android 13+. Android may request permission to install the APK. Release
 
 - **Focus:** no search, suggestions, badges, feeds, widgets, or custom animation.
 - **Efficiency:** no telemetry, analytics, polling, background services, scheduled work, or idle networking.
-- **Predictability:** favorites and the alphabetical app list share one vertical screen.
+- **Predictability:** one responsive APK uses a focused phone layout or a two-region tablet layout.
 - **Privacy:** current and 12-hour forecast weather is user-triggered; hidden apps require device authentication.
 - **Durability:** Kotlin, classic Android Views, platform APIs, zero production runtime dependencies.
 
@@ -36,7 +37,7 @@ Requires Android 13+. Android may request permission to install the APK. Release
 - Fewer steps from Home to app.
 - Exceptionally low idle battery, CPU, memory, and network use.
 - Configurable icons, typography, density, wallpaper, appearance, and efficient cached weather forecasts.
-- Fast favorites plus a complete alphabetical list.
+- Fast favorites plus a complete alphabetical list, including an efficient two-column tablet view.
 - English, Dutch, and Hindi; Android-managed configuration backup.
 
 ## Build

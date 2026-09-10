@@ -12,6 +12,7 @@ import android.widget.AbsListView
 import android.widget.BaseAdapter
 import android.widget.LinearLayout
 import android.widget.GridLayout
+import android.widget.GridView
 import android.widget.ImageView
 import android.widget.ImageButton
 import android.widget.TextView
@@ -34,7 +35,13 @@ class LauncherAdapter(
     private data class CachedIcon(val state: Drawable.ConstantState, val estimatedBytes: Int)
     private data class IconKey(val component: String, val theme: IconTheme, val color: Int)
 
-    private var rows: List<HomeRow> = listOf(HomeRow.Header)
+    private var sourceRows: List<HomeRow> = listOf(HomeRow.Header)
+    private var rows: List<HomeRow> = sourceRows
+    private var wideLayout = false
+    private var wideGlanceContainer: LinearLayout? = null
+    private var wideControlsContainer: LinearLayout? = null
+    private var wideFavoritesGrid: GridView? = null
+    private var wideWeatherVisible = false
     private var appearance = AppearanceConfig()
     private var timeText = ""
     private var dateText = ""
@@ -46,6 +53,7 @@ class LauncherAdapter(
     private var weatherSnapshot: WeatherSnapshot? = null
     private var weatherRefreshing = false
     private var weatherError: String? = null
+    private var boundHeaderView: LinearLayout? = null
     private var boundTimeView: TextView? = null
     private var boundDateView: TextView? = null
     private var boundAdditionalTimeView: LinearLayout? = null
@@ -80,7 +88,7 @@ class LauncherAdapter(
     override fun getCount() = rows.size
     override fun getItem(position: Int) = rows[position]
     override fun getItemId(position: Int) = position.toLong()
-    override fun getViewTypeCount() = 7
+    override fun getViewTypeCount() = 8
     override fun getItemViewType(position: Int) = when (rows[position]) {
         HomeRow.Header -> 0
         is HomeRow.App -> 1
@@ -89,10 +97,12 @@ class LauncherAdapter(
         HomeRow.Weather -> 4
         is HomeRow.AppsToggle -> 5
         HomeRow.Gap -> 6
+        is HomeRow.AppPair -> 7
     }
 
     fun submit(updatedRows: List<HomeRow>, updatedAppearance: AppearanceConfig, updatedWeather: WeatherConfig, updatedTextColor: Int) {
-        rows = updatedRows
+        sourceRows = updatedRows
+        rows = visibleRows()
         appearance = updatedAppearance
         weatherConfig = updatedWeather
         textColor = updatedTextColor
@@ -101,6 +111,7 @@ class LauncherAdapter(
             weatherError = null
             boundWeatherView = null
         }
+        refreshWideFixedViews()
         notifyDataSetChanged()
     }
 
@@ -115,8 +126,30 @@ class LauncherAdapter(
         appearance = updatedAppearance
         weatherConfig = updatedWeather
         textColor = updatedTextColor
-        if (requiresRebind) notifyDataSetChanged()
+        if (requiresRebind) {
+            refreshWideFixedViews(forceRebuild = true)
+            notifyDataSetChanged()
+        }
         else if (weatherPresetChanged) boundWeatherView?.let(::bindWeather)
+    }
+
+    fun configureLayout(
+        wide: Boolean,
+        glanceContainer: LinearLayout? = null,
+        controlsContainer: LinearLayout? = null,
+    ) {
+        wideLayout = wide
+        wideGlanceContainer = glanceContainer
+        wideControlsContainer = controlsContainer
+        wideFavoritesGrid = null
+        clearBoundFixedViews()
+        rows = visibleRows()
+        refreshWideFixedViews(forceRebuild = true)
+        notifyDataSetChanged()
+    }
+
+    fun scrollWideFavoritesToTop() {
+        wideFavoritesGrid?.setSelection(0)
     }
 
     fun updateWeather(snapshot: WeatherSnapshot?, refreshing: Boolean, error: String? = null) {
@@ -150,8 +183,9 @@ class LauncherAdapter(
     }
 
     fun preloadFavoriteIcons(apps: List<AppEntry>, config: AppearanceConfig, color: Int) {
-        if (config.iconTheme == IconTheme.NORMAL) apps.forEach { normalIcon(it) }
-        else iconProvider.preload(apps.map { it.component.packageName }, config.iconTheme, color)
+        val immediatelyVisible = if (wideLayout) apps.take(WIDE_VISIBLE_FAVORITES) else apps
+        if (config.iconTheme == IconTheme.NORMAL) immediatelyVisible.forEach { normalIcon(it) }
+        else iconProvider.preload(immediatelyVisible.map { it.component.packageName }, config.iconTheme, color)
     }
 
     fun close() {
@@ -169,10 +203,73 @@ class LauncherAdapter(
         HomeRow.Header -> headerView(recycled)
         HomeRow.Weather -> weatherView(recycled)
         is HomeRow.App -> appView(row, recycled)
+        is HomeRow.AppPair -> appPairView(row.apps, recycled)
         is HomeRow.Favorites -> favoritesView(row.apps, recycled)
         is HomeRow.AppsToggle -> appsToggleView(row.expanded, recycled)
         HomeRow.Gap -> gapView(recycled)
         HomeRow.Empty -> emptyView(recycled)
+    }
+
+    private fun visibleRows(): List<HomeRow> {
+        if (!wideLayout) return sourceRows
+        val appRows = sourceRows.mapNotNull { (it as? HomeRow.App)?.app }
+        if (appRows.isEmpty()) return sourceRows.filterIsInstance<HomeRow.Empty>()
+        return LayoutPolicy.rowMajorPairs(appRows).map(HomeRow::AppPair)
+    }
+
+    private fun refreshWideFixedViews(forceRebuild: Boolean = false) {
+        if (!wideLayout) return
+        val glance = wideGlanceContainer ?: return
+        val controls = wideControlsContainer ?: return
+        val shouldShowWeather = sourceRows.any { it == HomeRow.Weather }
+        if (forceRebuild || glance.childCount == 0 || shouldShowWeather != wideWeatherVisible) populateWideGlance(glance)
+        else {
+            boundHeaderView?.let { headerView(it) }
+            boundWeatherView?.let(::bindWeather)
+        }
+        populateWideControls(controls)
+    }
+
+    private fun populateWideGlance(container: LinearLayout) {
+        clearBoundFixedViews()
+        container.removeAllViews()
+        wideWeatherVisible = sourceRows.any { it == HomeRow.Weather }
+        container.addView(headerView(null), LinearLayout.LayoutParams(-1, -2))
+        if (wideWeatherVisible) {
+            container.addView(gapView(null), LinearLayout.LayoutParams(-1, dp(SECTION_GAP_DP)))
+            container.addView(weatherView(null), LinearLayout.LayoutParams(-1, -2))
+        }
+    }
+
+    private fun populateWideControls(container: LinearLayout) {
+        container.removeAllViews()
+        wideFavoritesGrid = null
+        val favorites = sourceRows.filterIsInstance<HomeRow.Favorites>().firstOrNull()?.apps
+        if (!favorites.isNullOrEmpty()) {
+            val grid = AdaptiveFavoritesList(context).apply {
+                isVerticalScrollBarEnabled = false
+                overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+                stretchMode = GridView.STRETCH_COLUMN_WIDTH
+                verticalSpacing = dp(6)
+                setPadding(dp(18), dp(8), dp(18), dp(8))
+                clipToPadding = false
+                adapter = FavoriteGridAdapter(favorites)
+            }
+            wideFavoritesGrid = grid
+            container.addView(grid, LinearLayout.LayoutParams(-1, dp(FAVORITE_VIEWPORT_DP)))
+        }
+        sourceRows.filterIsInstance<HomeRow.AppsToggle>().firstOrNull()?.let {
+            container.addView(appsToggleView(it.expanded, null), LinearLayout.LayoutParams(-1, -2))
+        }
+    }
+
+    private fun clearBoundFixedViews() {
+        boundHeaderView = null
+        boundTimeView = null
+        boundDateView = null
+        boundAdditionalTimeView = null
+        boundNextAlarmView = null
+        boundWeatherView = null
     }
 
     private fun weatherView(recycled: View?): View {
@@ -448,6 +545,8 @@ class LauncherAdapter(
                 setPadding(0, dp(4), 0, 0)
             })
         }
+        boundHeaderView = container
+        container.setPadding(dp(24), dp(if (wideLayout) 20 else 56), dp(24), 0)
         val sizes = when (appearance.clockPreset) {
             ClockPreset.COMPACT -> 34f to 15f
             ClockPreset.STANDARD -> 42f to 17f
@@ -525,8 +624,40 @@ class LauncherAdapter(
     }
 
     private fun appView(row: HomeRow.App, recycled: View?): View {
-        val app = row.app
         val view = recycled as? TextView ?: label(20f).apply { gravity = Gravity.CENTER_VERTICAL; isHapticFeedbackEnabled = true }
+        bindAppView(view, row.app)
+        return view
+    }
+
+    private fun appPairView(apps: List<AppEntry>, recycled: View?): View {
+        val row = recycled as? LinearLayout ?: LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = AbsListView.LayoutParams(-1, -2)
+            repeat(2) {
+                addView(label(20f).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    isHapticFeedbackEnabled = true
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+            }
+        }
+        repeat(2) { index ->
+            val cell = row.getChildAt(index) as TextView
+            val app = apps.getOrNull(index)
+            if (app == null) {
+                cell.visibility = View.INVISIBLE
+                cell.tag = null
+                cell.setCompoundDrawables(null, null, null, null)
+                cell.setOnClickListener(null)
+                cell.setOnLongClickListener(null)
+            } else {
+                cell.visibility = View.VISIBLE
+                bindAppView(cell, app)
+            }
+        }
+        return row
+    }
+
+    private fun bindAppView(view: TextView, app: AppEntry) {
         val vertical = when (appearance.density) { DensityPreset.COMPACT -> 11; DensityPreset.STANDARD -> 17; DensityPreset.COMFORTABLE -> 23 }
         view.setPadding(dp(28), dp(vertical), dp(28), dp(vertical))
         view.minHeight = dp(44)
@@ -546,7 +677,6 @@ class LauncherAdapter(
         } else view.setCompoundDrawables(null, null, null, null)
         view.setOnClickListener(appClickListener)
         view.setOnLongClickListener(appLongClickListener)
-        return view
     }
 
     private fun favoritesView(apps: List<AppEntry>, recycled: View?): View {
@@ -557,27 +687,34 @@ class LauncherAdapter(
         }
         while (grid.childCount > apps.size) grid.removeViewAt(grid.childCount - 1)
         apps.forEachIndexed { index, app ->
-            val icon = (grid.getChildAt(index) as? ImageView) ?: ImageView(context).apply {
+            val icon = (grid.getChildAt(index) as? ImageView) ?: favoriteIcon().apply {
                 layoutParams = GridLayout.LayoutParams().apply {
                     width = 0
                     height = dp(76)
                     columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
                     setMargins(dp(4), dp(3), dp(4), dp(3))
                 }
-                setPadding(dp(9), dp(9), dp(9), dp(9))
-                scaleType = ImageView.ScaleType.CENTER_INSIDE
-                isHapticFeedbackEnabled = true
             }.also(grid::addView)
-            icon.tag = app
-            bindIcon(app, favorite = true) { key, drawable ->
-                if (icon.tag == app && iconKey(app) == key) icon.setImageDrawable(drawable)
-            }
-            icon.contentDescription = app.label
-            icon.tooltipText = app.label
-            icon.setOnClickListener(appClickListener)
-            icon.setOnLongClickListener(appLongClickListener)
+            bindFavoriteIcon(icon, app)
         }
         return grid
+    }
+
+    private fun favoriteIcon() = ImageView(context).apply {
+        setPadding(dp(9), dp(9), dp(9), dp(9))
+        scaleType = ImageView.ScaleType.CENTER_INSIDE
+        isHapticFeedbackEnabled = true
+    }
+
+    private fun bindFavoriteIcon(icon: ImageView, app: AppEntry) {
+        icon.tag = app
+        bindIcon(app, favorite = true) { key, drawable ->
+            if (icon.tag == app && iconKey(app) == key) icon.setImageDrawable(drawable)
+        }
+        icon.contentDescription = app.label
+        icon.tooltipText = app.label
+        icon.setOnClickListener(appClickListener)
+        icon.setOnLongClickListener(appLongClickListener)
     }
 
     private fun emptyView(recycled: View?): View = (recycled as? TextView ?: label(18f)).apply {
@@ -674,6 +811,8 @@ class LauncherAdapter(
         private const val SECONDARY_TIME_ID = 1008
         private const val NEXT_ALARM_ID = 1009
         private const val SECTION_GAP_DP = 24
+        private const val FAVORITE_VIEWPORT_DP = 176
+        private const val WIDE_VISIBLE_FAVORITES = 12
         private val RAIN_CODES = setOf(51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82)
         private val SNOW_CODES = setOf(71, 73, 75, 77, 85, 86)
         private val THUNDER_CODES = setOf(95, 96, 99)
@@ -684,6 +823,27 @@ class LauncherAdapter(
         override fun onMeasure(widthSpec: Int, heightSpec: Int) {
             val available = MeasureSpec.getSize(widthSpec) - paddingLeft - paddingRight
             columnCount = LayoutPolicy.favoriteColumnCount((available / resources.displayMetrics.density).toInt())
+            super.onMeasure(widthSpec, heightSpec)
+        }
+    }
+
+    private inner class FavoriteGridAdapter(private val apps: List<AppEntry>) : BaseAdapter() {
+        override fun getCount() = apps.size
+        override fun getItem(position: Int) = apps[position]
+        override fun getItemId(position: Int) = position.toLong()
+        override fun getView(position: Int, recycled: View?, parent: ViewGroup): View {
+            val icon = recycled as? ImageView ?: favoriteIcon().apply {
+                layoutParams = AbsListView.LayoutParams(-1, dp(76))
+            }
+            bindFavoriteIcon(icon, apps[position])
+            return icon
+        }
+    }
+
+    private class AdaptiveFavoritesList(context: Context) : GridView(context) {
+        override fun onMeasure(widthSpec: Int, heightSpec: Int) {
+            val available = MeasureSpec.getSize(widthSpec) - paddingLeft - paddingRight
+            numColumns = LayoutPolicy.favoriteColumnCount((available / resources.displayMetrics.density).toInt())
             super.onMeasure(widthSpec, heightSpec)
         }
     }

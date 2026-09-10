@@ -116,7 +116,9 @@ class LauncherInstrumentedTest {
             Thread.sleep(50)
         }
         assertTrue((0 until list.adapter.count).any {
-            list.adapter.getItem(it) is HomeRow.App || list.adapter.getItem(it) is HomeRow.AppsToggle
+            list.adapter.getItem(it) is HomeRow.App ||
+                list.adapter.getItem(it) is HomeRow.AppPair ||
+                list.adapter.getItem(it) is HomeRow.AppsToggle
         })
         activity.finish()
     }

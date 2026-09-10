@@ -12,6 +12,16 @@ class LayoutPolicyTest {
         assertEquals(4, LayoutPolicy.favoriteColumnCount(393))
         assertEquals(4, LayoutPolicy.favoriteColumnCount(439))
         assertEquals(5, LayoutPolicy.favoriteColumnCount(440))
+        assertEquals(6, LayoutPolicy.favoriteColumnCount(720))
+    }
+
+    @Test
+    fun wideLayoutUsesWindowWidthAndBoundsTheGlancePanel() {
+        assertFalse(LayoutPolicy.isWideLayout(839))
+        assertTrue(LayoutPolicy.isWideLayout(840))
+        assertEquals(360, LayoutPolicy.glancePanelWidth(840))
+        assertEquals(360, LayoutPolicy.glancePanelWidth(1280))
+        assertEquals(listOf(listOf("A", "B"), listOf("C", "D"), listOf("E")), LayoutPolicy.rowMajorPairs(listOf("A", "B", "C", "D", "E")))
     }
 
     @Test

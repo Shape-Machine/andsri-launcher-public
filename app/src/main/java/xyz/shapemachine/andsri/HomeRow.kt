@@ -6,6 +6,7 @@ sealed interface HomeRow {
     data class Favorites(val apps: List<AppEntry>) : HomeRow
     data class AppsToggle(val expanded: Boolean) : HomeRow
     data class App(val app: AppEntry) : HomeRow
+    data class AppPair(val apps: List<AppEntry>) : HomeRow
     data object Gap : HomeRow
     data object Empty : HomeRow
 }

@@ -8,6 +8,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.LauncherApps
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.BlendMode
 import android.graphics.BlendModeColorFilter
@@ -18,19 +19,23 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.Parcelable
 import android.provider.Settings
 import android.provider.AlarmClock
 import android.view.Menu
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.ListView
 import android.widget.PopupMenu
+import android.widget.ScrollView
 import android.widget.Toast
 import java.text.DateFormat
 import java.util.Calendar
@@ -45,6 +50,7 @@ class MainActivity : Activity() {
     private lateinit var listView: ListView
     private lateinit var root: FrameLayout
     private lateinit var customWallpaper: ImageView
+    private var contentView: View? = null
     private lateinit var weatherCache: WeatherCache
     private val weatherClient = OpenMeteoClient()
     private val weatherRequestGate = RequestGate()
@@ -126,23 +132,14 @@ class MainActivity : Activity() {
             },
             onAppsToggle = preferences::setAppsExpanded,
         )
-        listView = ListView(this).apply {
-            id = LIST_ID
-            setAdapter(this@MainActivity.adapter)
-            divider = null
-            isFastScrollEnabled = false
-            isVerticalScrollBarEnabled = false
-            cacheColorHint = Color.TRANSPARENT
-            setBackgroundColor(Color.TRANSPARENT)
-            clipToPadding = false
-        }
+        listView = createAppList()
         customWallpaper = ImageView(this).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
         root = FrameLayout(this).apply {
             addView(customWallpaper, FrameLayout.LayoutParams(-1, -1))
             addView(View(this@MainActivity).apply { id = OVERLAY_ID }, FrameLayout.LayoutParams(-1, -1))
-            addView(listView, FrameLayout.LayoutParams(-1, -1))
             addView(View(this@MainActivity).apply { id = STATUS_BAR_ID }, FrameLayout.LayoutParams(-1, 0, Gravity.TOP))
         }
+        rebuildContent()
         setContentView(root)
         preferences.registerChangeListener(preferenceListener)
         getSystemService(LauncherApps::class.java).registerCallback(launcherCallback, handler)
@@ -178,6 +175,21 @@ class MainActivity : Activity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         listView.setSelection(0)
+        adapter.scrollWideFavoritesToTop()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        val listState = listView.onSaveInstanceState()
+        super.onConfigurationChanged(newConfig)
+        rebuildContent(listState)
+        refreshClockFormatters(preferences.appearance())
+        updateClock()
+        if (displayedWallpaper != null) {
+            customWallpaper.setImageDrawable(null)
+            displayedWallpaper = null
+            appliedAppearance = null
+            requestReload()
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -197,10 +209,68 @@ class MainActivity : Activity() {
                 layoutParams = (layoutParams as FrameLayout.LayoutParams).apply { height = statusHeight }
                 setBackgroundColor(systemBarBackground())
             }
+            view.findViewById<View>(WIDE_CONTENT_ID)?.setPadding(0, statusHeight, 0, 0)
             view.setPadding(0, 0, 0, insets.getInsets(WindowInsets.Type.navigationBars()).bottom)
             insets
         }
     }
+
+    private fun createAppList() = ListView(this).apply {
+        id = LIST_ID
+        adapter = this@MainActivity.adapter
+        divider = null
+        isFastScrollEnabled = false
+        isVerticalScrollBarEnabled = false
+        cacheColorHint = Color.TRANSPARENT
+        setBackgroundColor(Color.TRANSPARENT)
+        clipToPadding = false
+    }
+
+    private fun rebuildContent(listState: Parcelable? = null) {
+        (listView.parent as? ViewGroup)?.removeView(listView)
+        contentView?.let(root::removeView)
+        val wideLayout = LayoutPolicy.isWideLayout(resources.configuration.screenWidthDp)
+        val replacement = if (wideLayout) createWideContent() else {
+            adapter.configureLayout(wide = false)
+            listView
+        }
+        contentView = replacement
+        root.addView(replacement, 2, FrameLayout.LayoutParams(-1, -1))
+        root.requestApplyInsets()
+        if (listState != null) listView.post { listView.onRestoreInstanceState(listState) }
+    }
+
+    private fun createWideContent(): View {
+        val glance = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
+        val glanceScroll = ScrollView(this).apply {
+            isFillViewport = true
+            isVerticalScrollBarEnabled = false
+            overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+            addView(glance, ViewGroup.LayoutParams(-1, -2))
+        }
+        val controls = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val apps = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(16), dp(20), 0)
+            addView(controls, LinearLayout.LayoutParams(-1, -2))
+            addView(listView, LinearLayout.LayoutParams(-1, 0, 1f))
+        }
+        adapter.configureLayout(wide = true, glanceContainer = glance, controlsContainer = controls)
+        return LinearLayout(this).apply {
+            id = WIDE_CONTENT_ID
+            orientation = LinearLayout.HORIZONTAL
+            addView(
+                glanceScroll,
+                LinearLayout.LayoutParams(dp(LayoutPolicy.glancePanelWidth(resources.configuration.screenWidthDp)), -1),
+            )
+            addView(apps, LinearLayout.LayoutParams(0, -1, 1f))
+        }
+    }
+
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     private fun requestHomeRoleIfNeeded() {
         val roleManager = getSystemService(RoleManager::class.java)
@@ -548,6 +618,7 @@ class MainActivity : Activity() {
         private const val OVERLAY_ID = 2001
         const val LIST_ID = 2002
         private const val STATUS_BAR_ID = 2003
+        private const val WIDE_CONTENT_ID = 2004
     }
 
     private data class WallpaperUpdate(val uri: String, val bitmap: Bitmap?)
