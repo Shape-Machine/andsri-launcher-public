@@ -69,7 +69,8 @@ class MainActivity : Activity() {
     private var additionalTimeFormatters: List<DateFormat> = emptyList()
     private var additionalTimeValues: Array<String> = emptyArray()
     private var nextAlarmTriggerMillis: Long? = null
-    private var nextAlarmDisplayText = ""
+    private var displayedAlarmRelativeTime: AlarmRelativeTime? = null
+    private var displayedAlarmText = ""
     private val clockCalendar = Calendar.getInstance()
     private var displayedDay = Int.MIN_VALUE
     private var displayedDate = ""
@@ -421,7 +422,7 @@ class MainActivity : Activity() {
             displayedDate,
             additionalTimeNames,
             additionalTimeValues,
-            nextAlarmDisplayText.takeIf { nextAlarmTriggerMillis?.let { trigger -> trigger > now.time } == true }.orEmpty(),
+            formatNextAlarm(now.time),
         )
     }
 
@@ -443,12 +444,25 @@ class MainActivity : Activity() {
         nextAlarmTriggerMillis = if (appearance.showNextAlarm) {
             getSystemService(AlarmManager::class.java).nextAlarmClock?.triggerTime
         } else null
-        nextAlarmDisplayText = nextAlarmTriggerMillis?.let {
-            getString(
-                R.string.next_alarm_value,
-                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(it)),
-            )
-        }.orEmpty()
+        displayedAlarmRelativeTime = null
+        displayedAlarmText = ""
+    }
+
+    private fun formatNextAlarm(nowMillis: Long): String {
+        val relative = nextAlarmTriggerMillis?.let { AlarmRelativeTime.from(nowMillis, it) }
+        if (relative == displayedAlarmRelativeTime) return displayedAlarmText
+        displayedAlarmRelativeTime = relative
+        if (relative == null) {
+            displayedAlarmText = ""
+            return displayedAlarmText
+        }
+        val resource = when (relative.unit) {
+            AlarmTimeUnit.MINUTES -> R.plurals.next_alarm_minutes
+            AlarmTimeUnit.HOURS -> R.plurals.next_alarm_hours
+            AlarmTimeUnit.DAYS -> R.plurals.next_alarm_days
+        }
+        displayedAlarmText = resources.getQuantityString(resource, relative.value, relative.value)
+        return displayedAlarmText
     }
 
     private fun scheduleNextMinute() {

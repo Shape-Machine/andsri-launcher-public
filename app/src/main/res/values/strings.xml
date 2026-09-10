@@ -81,7 +81,9 @@
     <string name="list_density">List density</string>
     <string name="solid_background">Solid background</string>
     <string name="show_next_alarm">Show next alarm</string>
-    <string name="next_alarm_value">Alarm · %1$s</string>
+    <plurals name="next_alarm_minutes"><item quantity="one">Alarm · in %d min</item><item quantity="other">Alarm · in %d min</item></plurals>
+    <plurals name="next_alarm_hours"><item quantity="one">Alarm · in %d hr</item><item quantity="other">Alarm · in %d hr</item></plurals>
+    <plurals name="next_alarm_days"><item quantity="one">Alarm · in %d day</item><item quantity="other">Alarm · in %d days</item></plurals>
     <string name="additional_time_zone">Additional timezone</string>
     <string name="additional_time_zone_number">Additional timezone %1$d</string>
     <string name="add_time_zone">Add timezone</string>

@@ -137,13 +137,15 @@ class LauncherAdapter(
         dateText = date
         additionalTimeNames = updatedAdditionalTimeNames
         additionalTimeValues = updatedAdditionalTimeValues
-        nextAlarmText = nextAlarm
         boundTimeView?.text = time
         boundDateView?.text = date
         boundAdditionalTimeView?.let { bindAdditionalTimes(it, applyStyle = false) }
-        boundNextAlarmView?.apply {
-            text = nextAlarm
-            visibility = if (nextAlarm.isBlank()) View.GONE else View.VISIBLE
+        if (nextAlarmText != nextAlarm) {
+            nextAlarmText = nextAlarm
+            boundNextAlarmView?.apply {
+                text = nextAlarm
+                visibility = if (nextAlarm.isBlank()) View.GONE else View.VISIBLE
+            }
         }
     }
 

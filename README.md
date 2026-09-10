@@ -6,7 +6,7 @@ Minimal Android launcher. One scrolling screen. No clutter. Android 13+.
 
 | Screen | Light | Dark |
 |---|---|---|
-| Home, weather, 4 favorites | <img src="docs/screenshots/light-home-weather.png" width="210" alt="Home with weather and four favorites in light mode"> | <img src="docs/screenshots/dark-home-weather.png" width="210" alt="Home with weather and four favorites in dark mode"> |
+| Home, weather, next alarm | <img src="docs/screenshots/light-home-weather.png" width="210" alt="Home with weather and a humanized next alarm in light mode"> | <img src="docs/screenshots/dark-home-weather.png" width="210" alt="Home with weather and a humanized next alarm in dark mode"> |
 | Home, weather, 8 favorites | <img src="docs/screenshots/light-home-eight-favorites.png" width="210" alt="Home with weather and eight favorites in light mode"> | <img src="docs/screenshots/dark-home-eight-favorites.png" width="210" alt="Home with weather and eight favorites in dark mode"> |
 | Newsreader serif home | <img src="docs/screenshots/light-home-serif.png" width="210" alt="Home using Newsreader serif typography in light mode"> | <img src="docs/screenshots/dark-home-serif.png" width="210" alt="Home using Newsreader serif typography in dark mode"> |
 | All apps | <img src="docs/screenshots/light-all-apps.png" width="210" alt="All apps in light mode"> | <img src="docs/screenshots/dark-all-apps.png" width="210" alt="All apps in dark mode"> |
