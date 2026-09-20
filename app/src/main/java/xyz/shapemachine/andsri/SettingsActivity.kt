@@ -1,6 +1,7 @@
 package xyz.shapemachine.andsri
 
-import android.app.Activity
+import xyz.shapemachine.andsri.settings.SettingsControls
+import xyz.shapemachine.andsri.settings.SettingsPageActivity
 import android.app.AlertDialog
 import android.app.LocaleManager
 import android.content.Intent
@@ -36,7 +37,7 @@ import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
 
-class SettingsActivity : Activity() {
+class SettingsActivity : SettingsPageActivity() {
     private lateinit var preferences: LauncherPreferences
     private lateinit var repository: AppRepository
     private val loader = java.util.concurrent.Executors.newSingleThreadExecutor()
@@ -48,6 +49,7 @@ class SettingsActivity : Activity() {
     private var hiddenPromptCancellation: android.os.CancellationSignal? = null
     private var hiddenDialog: AlertDialog? = null
     private val weatherClient = OpenMeteoClient()
+    private var locationDialog: AlertDialog? = null
     private val locationRequestGate = RequestGate()
     private val weatherCache by lazy { WeatherCache(this) }
     private val appearance by lazy { preferences.appearance() }
@@ -66,6 +68,7 @@ class SettingsActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         preferences = LauncherPreferences(this)
+        applySettingsTheme(AppearanceResolver.isDark(this, preferences.appearance()))
         configureSystemBarIcons()
         repository = AppRepository(this)
         render()
@@ -163,13 +166,13 @@ class SettingsActivity : Activity() {
                 preferences.saveAppearance(preferences.appearance().copy(font = it)); recreate()
             }
             section(R.string.general)
-            action(R.string.language, ::setLanguage)
+            action(R.string.language, ::setLanguage, SettingsControls.language(this@SettingsActivity, getString(R.string.option_system)))
             action(R.string.default_home, ::openHomeSettings)
             action(R.string.open_source_licenses, ::showLicenses)
             section(R.string.danger_zone)
             action(R.string.reset_launcher, ::confirmReset)
         }
-        val scroll = ScrollView(this).apply { setBackgroundColor(backgroundColor); addView(content) }
+        val scroll = ScrollView(this).apply { setBackgroundColor(backgroundColor); addView(content); trackSettingsScroll(this) }
         setContentView(FrameLayout(this).apply {
             setBackgroundColor(backgroundColor)
             addView(scroll, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -224,57 +227,10 @@ class SettingsActivity : Activity() {
         onPick: (T) -> Unit,
     ) {
         addView(title(getString(label), 16f).apply { setPadding(dp(4), dp(14), dp(4), dp(4)) })
-        val labels = values.map(::enumLabel)
-        val availableWidth = dp(resources.configuration.screenWidthDp) - paddingLeft - paddingRight
-        val stackSegments = vertical || LayoutPolicy.shouldStackSegments(
-            availableWidth,
-            labels.map {
-                settingsTypeface.measureText(
-                    it,
-                    android.util.TypedValue.applyDimension(
-                        android.util.TypedValue.COMPLEX_UNIT_SP,
-                        13f,
-                        resources.displayMetrics,
-                    ),
-                )
-            },
-            dp(12),
-        )
-        val ids = mutableMapOf<Int, T>()
-        addView(RadioGroup(context).apply {
-            orientation = if (stackSegments) RadioGroup.VERTICAL else RadioGroup.HORIZONTAL
-            values.forEachIndexed { index, value ->
-                val id = View.generateViewId()
-                ids[id] = value
-                addView(RadioButton(context).apply {
-                    this.id = id
-                    text = labels[index]
-                    textSize = 13f
-                    typeface = if (value is FontPreset) fontTypeface(value) else settingsTypeface
-                    buttonDrawable = null
-                    background = segmentBackground(index, values.lastIndex, stackSegments)
-                    setTextColor(ColorStateList(
-                        arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                        intArrayOf(backgroundColor, foregroundColor),
-                    ))
-                    gravity = Gravity.CENTER
-                    minHeight = dp(44)
-                    isChecked = value == selected
-                    setPadding(dp(6), dp(8), dp(6), dp(8))
-                }, if (stackSegments) {
-                    RadioGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-                } else {
-                    RadioGroup.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-                })
-            }
-            setOnCheckedChangeListener { _, checkedId -> ids[checkedId]?.let(onPick) }
-        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
-    }
-
-    private fun Typeface.measureText(text: String, textSize: Float) = android.graphics.Paint().run {
-        typeface = this@measureText
-        this.textSize = textSize
-        measureText(text)
+        addView(SettingsControls.choices(context, values, selected, ::enumLabel,
+            { value -> if (value is FontPreset) fontTypeface(value) else settingsTypeface },
+            foregroundColor, backgroundColor, appearance.density.ordinal, vertical, onPick),
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
     }
 
     private fun fontTypeface(font: FontPreset): Typeface = resources.getFont(when (font) {
@@ -282,38 +238,6 @@ class SettingsActivity : Activity() {
         FontPreset.SERIF -> R.font.newsreader_regular
         FontPreset.MONOSPACE -> R.font.maple_mono_regular
     })
-
-    private fun segmentBackground(index: Int, lastIndex: Int, vertical: Boolean): StateListDrawable {
-        val radius = dp(10).toFloat()
-        val isRtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
-        val atStart = if (vertical || !isRtl) index == 0 else index == lastIndex
-        val atEnd = if (vertical || !isRtl) index == lastIndex else index == 0
-        val radii = if (vertical) {
-            floatArrayOf(
-                if (atStart) radius else 0f, if (atStart) radius else 0f,
-                if (atStart) radius else 0f, if (atStart) radius else 0f,
-                if (atEnd) radius else 0f, if (atEnd) radius else 0f,
-                if (atEnd) radius else 0f, if (atEnd) radius else 0f,
-            )
-        } else {
-            floatArrayOf(
-                if (atStart) radius else 0f, if (atStart) radius else 0f,
-                if (atEnd) radius else 0f, if (atEnd) radius else 0f,
-                if (atEnd) radius else 0f, if (atEnd) radius else 0f,
-                if (atStart) radius else 0f, if (atStart) radius else 0f,
-            )
-        }
-        fun shape(fill: Int) = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            color = ColorStateList.valueOf(fill)
-            cornerRadii = radii
-            setStroke(dp(1), Color.argb(110, Color.red(foregroundColor), Color.green(foregroundColor), Color.blue(foregroundColor)))
-        }
-        return StateListDrawable().apply {
-            addState(intArrayOf(android.R.attr.state_checked), shape(foregroundColor))
-            addState(intArrayOf(), shape(Color.TRANSPARENT))
-        }
-    }
 
     private fun LinearLayout.fadeControl() {
         addView(title(getString(R.string.wallpaper_fade), 16f).apply { setPadding(dp(4), dp(14), dp(4), 0) })
@@ -616,8 +540,10 @@ class SettingsActivity : Activity() {
             .setPositiveButton(R.string.find_location, null)
         if (onClear != null) builder.setNeutralButton(R.string.option_off) { _, _ -> onClear() }
         val dialog = builder.create()
+        locationDialog = dialog
         var completed = false
         dialog.setOnDismissListener {
+            if (locationDialog === dialog) locationDialog = null
             if (!completed) {
                 locationRequestGate.invalidate()
                 weatherClient.cancel()
@@ -739,6 +665,10 @@ class SettingsActivity : Activity() {
     }
 
     override fun onStop() {
+        locationDialog?.dismiss()
+        locationDialog = null
+        locationRequestGate.invalidate()
+        weatherClient.cancel()
         hiddenPromptCancellation?.cancel(); hiddenPromptCancellation = null
         hiddenDialog?.dismiss(); hiddenDialog = null
         super.onStop()

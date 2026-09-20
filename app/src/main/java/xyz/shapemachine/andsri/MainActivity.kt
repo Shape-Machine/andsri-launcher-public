@@ -159,6 +159,10 @@ class MainActivity : Activity() {
     override fun onPause() {
         isActive = false
         handler.removeCallbacks(clockTick)
+        val refreshWasActive = weatherRequestGate.isActive()
+        weatherRequestGate.invalidate()
+        weatherClient.cancel()
+        if (refreshWasActive) adapter.updateWeather(weatherCache.load(preferences.weather()), refreshing = false)
         super.onPause()
     }
 
