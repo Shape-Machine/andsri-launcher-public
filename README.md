@@ -20,7 +20,7 @@ Weather data shown is representative.
 
 **[Download the latest signed APK](https://github.com/Shape-Machine/andsri-launcher-public/releases/latest/download/andSri.apk)** · [Release notes](https://github.com/Shape-Machine/andsri-launcher-public/releases/latest) · [SHA-256 checksums](https://github.com/Shape-Machine/andsri-launcher-public/releases/latest/download/SHA256SUMS)
 
-Latest release: **0.8.11**. Unified settings controls and YouTube icons in every bundled pack.
+Latest release: **0.8.12**. Idle loading threads now retire automatically.
 
 Requires Android 13+. Android may request permission to install the APK. Release certificate SHA-256: `05eab865f1f91c995c59677ff09f777e854e84e9c2ee9e16d868972f052680ea`. Signed updates preserve settings.
 

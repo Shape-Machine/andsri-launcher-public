@@ -18,7 +18,6 @@ import android.widget.ImageButton
 import android.widget.TextView
 import android.util.LruCache
 import android.util.TypedValue
-import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
 class LauncherAdapter(
@@ -67,7 +66,7 @@ class LauncherAdapter(
         override fun sizeOf(key: String, value: CachedIcon) = value.estimatedBytes
     }
     private val fontCache = mutableMapOf<FontPreset, Typeface>()
-    private val iconLoader = Executors.newSingleThreadExecutor()
+    private val iconLoader = IdleExecutors.single()
     private val iconLock = Any()
     private val pendingIconCallbacks = mutableMapOf<IconKey, MutableList<(IconKey, Drawable) -> Unit>>()
     private val failedIcons = mutableSetOf<IconKey>()

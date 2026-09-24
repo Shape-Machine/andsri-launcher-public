@@ -41,7 +41,6 @@ import java.text.DateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.TimeZone
-import java.util.concurrent.Executors
 
 class MainActivity : Activity() {
     private lateinit var adapter: LauncherAdapter
@@ -54,7 +53,7 @@ class MainActivity : Activity() {
     private lateinit var weatherCache: WeatherCache
     private val weatherClient = OpenMeteoClient()
     private val weatherRequestGate = RequestGate()
-    private val loader = Executors.newSingleThreadExecutor()
+    private val loader = IdleExecutors.single()
     private val reloadLock = Any()
     private var reloadRunning = false
     private var reloadPosted = false

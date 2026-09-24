@@ -40,7 +40,7 @@ import android.widget.Toast
 class SettingsActivity : SettingsPageActivity() {
     private lateinit var preferences: LauncherPreferences
     private lateinit var repository: AppRepository
-    private val loader = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val loader = IdleExecutors.single()
     @Volatile private var installedApps: List<AppEntry> = emptyList()
     private val apps get() = installedApps
     private var appsLoaded = false

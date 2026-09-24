@@ -10,8 +10,8 @@ android {
         applicationId = "xyz.shapemachine.andsri"
         minSdk = 33
         targetSdk = 36
-        versionCode = 23
-        versionName = "0.8.11"
+        versionCode = 24
+        versionName = "0.8.12"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
