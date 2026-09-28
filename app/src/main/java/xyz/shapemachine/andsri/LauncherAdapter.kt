@@ -536,6 +536,7 @@ class LauncherAdapter(
             text = nextAlarmText
             visibility = if (nextAlarmText.isBlank()) View.GONE else View.VISIBLE
             setTextColor(textColor)
+            alpha = 0.65f
             typeface = font()
             setOnClickListener { onClockClick() }
         }
