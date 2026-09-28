@@ -8,6 +8,7 @@ import android.text.TextUtils
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.style.ForegroundColorSpan
+import android.text.style.RelativeSizeSpan
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -350,6 +351,7 @@ class LauncherAdapter(
                 val mutedColor = Color.argb((Color.alpha(textColor) * 0.65f).roundToInt(),
                     Color.red(textColor), Color.green(textColor), Color.blue(textColor))
                 setSpan(ForegroundColorSpan(mutedColor), ageStart, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+                setSpan(RelativeSizeSpan(0.75f), ageStart, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
             }
         }
         if (snapshot != null && snapshot.forecast.size >= 12) {
@@ -492,19 +494,19 @@ class LauncherAdapter(
                     setOnClickListener { anchor -> anchor.performHapticFeedback(0); onSettingsClick() }
                 }, LinearLayout.LayoutParams(dp(48), dp(48)))
             })
+            addView(label(14f).apply {
+                id = NEXT_ALARM_ID
+                gravity = Gravity.CENTER
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+                setPadding(0, dp(4), 0, 0)
+            })
             addView(label(17f).apply { id = DATE_ID; gravity = Gravity.CENTER; maxLines = 2; layoutParams = LinearLayout.LayoutParams(-1, -2); setPadding(0, dp(6), 0, 0) })
             addView(LinearLayout(context).apply {
                 id = SECONDARY_TIME_ID
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
                 layoutParams = LinearLayout.LayoutParams(-1, -2)
-                setPadding(0, dp(4), 0, 0)
-            })
-            addView(label(14f).apply {
-                id = NEXT_ALARM_ID
-                gravity = Gravity.CENTER
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
                 setPadding(0, dp(4), 0, 0)
             })
         }
@@ -520,7 +522,7 @@ class LauncherAdapter(
             text = timeText
             setAutoSizeTextTypeUniformWithConfiguration(24, sizes.first.toInt(), 1, TypedValue.COMPLEX_UNIT_SP)
             setTextColor(textColor)
-            typeface = font()
+            typeface = if (appearance.clockPreset == ClockPreset.EMPHASIZED) Typeface.create(font(), Typeface.BOLD) else font()
             setOnClickListener { onClockClick() }
         }
         container.findViewById<ImageButton>(SETTINGS_ID).drawable?.setTint(textColor)

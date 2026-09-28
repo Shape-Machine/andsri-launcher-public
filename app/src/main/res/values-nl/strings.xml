@@ -36,4 +36,10 @@
     <plurals name="weather_updated_hours"><item quantity="one">%d uur geleden</item><item quantity="other">%d uur geleden</item></plurals>
     <plurals name="weather_updated_days"><item quantity="one">%d dag geleden</item><item quantity="other">%d dagen geleden</item></plurals>
     <plurals name="weather_hours_from_now"><item quantity="one">over %d u</item><item quantity="other">over %d u</item></plurals>
+    <string name="additional_time_zones">Extra tijdzones</string>
+    <string name="add_up_to_three_cities">Voeg maximaal 3 steden toe</string>
+    <string name="up_to_three_cities">Maximaal 3 steden</string>
+    <string name="add_city">Stad toevoegen</string>
+    <string name="remove_time_zone">Verwijderen</string>
+    <string name="remove_time_zone_named">%1$s verwijderen</string>
 </resources>

@@ -50,6 +50,7 @@ class SettingsActivity : SettingsPageActivity() {
     private var hiddenDialog: AlertDialog? = null
     private val weatherClient = OpenMeteoClient()
     private var locationDialog: AlertDialog? = null
+    private var timeZonesDialog: AlertDialog? = null
     private val locationRequestGate = RequestGate()
     private val weatherCache by lazy { WeatherCache(this) }
     private val appearance by lazy { preferences.appearance() }
@@ -72,6 +73,12 @@ class SettingsActivity : SettingsPageActivity() {
         configureSystemBarIcons()
         repository = AppRepository(this)
         render()
+        if (savedInstanceState?.getBoolean("time_zones_open") == true) showAdditionalTimeZones()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean("time_zones_open", timeZonesDialog?.isShowing == true)
+        super.onSaveInstanceState(outState)
     }
 
     @Suppress("DEPRECATION")
@@ -140,16 +147,9 @@ class SettingsActivity : SettingsPageActivity() {
             switchControl(R.string.show_next_alarm, appearance.showNextAlarm) {
                 preferences.saveAppearance(preferences.appearance().copy(showNextAlarm = it))
             }
-            appearance.additionalTimeZones.forEachIndexed { index, zone ->
-                action(
-                    getString(R.string.additional_time_zone_number, index + 1),
-                    { editAdditionalTimeZone(index) },
-                    zone.locationName,
-                )
-            }
-            if (appearance.additionalTimeZones.size < MAX_ADDITIONAL_TIME_ZONES) {
-                action(R.string.add_time_zone, { editAdditionalTimeZone(appearance.additionalTimeZones.size) })
-            }
+            action(R.string.additional_time_zones, ::showAdditionalTimeZones,
+                appearance.additionalTimeZones.joinToString(" · ") { it.locationName }
+                    .ifEmpty { getString(R.string.add_up_to_three_cities) })
             enumControl(R.string.list_density, DensityPreset.entries, appearance.density) {
                 preferences.saveAppearance(preferences.appearance().copy(density = it)); recreate()
             }
@@ -606,11 +606,52 @@ class SettingsActivity : SettingsPageActivity() {
 
     private fun openHomeSettings() = startActivity(Intent(Settings.ACTION_HOME_SETTINGS))
 
+    private fun showAdditionalTimeZones() {
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(20), dp(8), dp(20), dp(8))
+        }
+        val spacing = when (appearance.density) {
+            DensityPreset.COMPACT -> 8
+            DensityPreset.STANDARD -> 12
+            DensityPreset.COMFORTABLE -> 16
+        }
+        content.addView(title(getString(R.string.up_to_three_cities), 14f).apply { alpha = 0.65f })
+        preferences.appearance().additionalTimeZones.forEachIndexed { index, zone ->
+            content.addView(LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, dp(spacing), 0, dp(spacing))
+                addView(title(zone.locationName, 18f), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                addView(android.widget.Button(this@SettingsActivity).apply {
+                    text = getString(R.string.remove_time_zone)
+                    typeface = settingsTypeface
+                    contentDescription = getString(R.string.remove_time_zone_named, zone.locationName)
+                    minHeight = dp(48)
+                    setOnClickListener { saveAdditionalTimeZone(index, null) }
+                })
+            })
+        }
+        val builder = AlertDialog.Builder(this).setTitle(R.string.additional_time_zones)
+            .setView(ScrollView(this).apply { addView(content) })
+            .setPositiveButton(android.R.string.ok, null)
+        if (preferences.appearance().additionalTimeZones.size < MAX_ADDITIONAL_TIME_ZONES) {
+            builder.setNeutralButton(R.string.add_city, null)
+        }
+        val dialog = builder.create()
+        timeZonesDialog = dialog
+        dialog.setOnDismissListener { if (timeZonesDialog === dialog) timeZonesDialog = null }
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL)?.setOnClickListener {
+                editAdditionalTimeZone(preferences.appearance().additionalTimeZones.size)
+            }
+        }
+        dialog.show()
+    }
+
     private fun editAdditionalTimeZone(index: Int) = editLocation(
         title = R.string.additional_time_zone,
         currentName = preferences.appearance().additionalTimeZones.getOrNull(index)?.locationName,
         filter = { it.timeZoneId != null },
-        onClear = { saveAdditionalTimeZone(index, null) },
         onLocations = { chooseAdditionalTimeZone(index, it) },
     )
 
@@ -668,6 +709,8 @@ class SettingsActivity : SettingsPageActivity() {
     }
 
     override fun onDestroy() {
+        timeZonesDialog?.dismiss()
+        timeZonesDialog = null
         locationRequestGate.invalidate()
         weatherClient.cancel()
         loader.shutdownNow()

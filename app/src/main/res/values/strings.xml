@@ -119,4 +119,10 @@
     <string name="option_standard">Standard</string>
     <string name="option_comfortable">Comfortable</string>
     <string name="option_emphasized">Emphasized</string>
+    <string name="additional_time_zones">Additional time zones</string>
+    <string name="add_up_to_three_cities">Add up to 3 cities</string>
+    <string name="up_to_three_cities">Up to 3 cities</string>
+    <string name="add_city">Add city</string>
+    <string name="remove_time_zone">Remove</string>
+    <string name="remove_time_zone_named">Remove %1$s</string>
 </resources>

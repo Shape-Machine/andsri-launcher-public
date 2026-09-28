@@ -36,4 +36,10 @@
     <plurals name="weather_updated_hours"><item quantity="one">%d घंटा पहले</item><item quantity="other">%d घंटे पहले</item></plurals>
     <plurals name="weather_updated_days"><item quantity="one">%d दिन पहले</item><item quantity="other">%d दिन पहले</item></plurals>
     <plurals name="weather_hours_from_now"><item quantity="one">%d घंटे में</item><item quantity="other">%d घंटे में</item></plurals>
+    <string name="additional_time_zones">अतिरिक्त समय क्षेत्र</string>
+    <string name="add_up_to_three_cities">अधिकतम 3 शहर जोड़ें</string>
+    <string name="up_to_three_cities">अधिकतम 3 शहर</string>
+    <string name="add_city">शहर जोड़ें</string>
+    <string name="remove_time_zone">हटाएँ</string>
+    <string name="remove_time_zone_named">%1$s हटाएँ</string>
 </resources>
