@@ -64,7 +64,7 @@ class LauncherInstrumentedTest {
                 AdditionalTimeZone("New York", "America/New_York"),
             ),
         ))
-        preferences.saveWeather(WeatherConfig(WeatherLocation("Amsterdam", 52.37, 4.89), WeatherPreset.COMPACT, TemperatureUnit.CELSIUS))
+        preferences.saveWeather(WeatherConfig(WeatherLocation("Amsterdam", 52.37, 4.89), TemperatureUnit.CELSIUS))
         preferences.setAppsExpanded(true)
         preferences.reconcileInstalled(setOf("one/component"), preferences.snapshot())
         assertTrue(preferences.favoriteComponents() == listOf("one/component"))
@@ -75,7 +75,7 @@ class LauncherInstrumentedTest {
         assertTrue(preferences.appearance().additionalTimeZones.size == 3)
         assertTrue(preferences.appearance().additionalTimeZones.first().timeZoneId == "Asia/Kolkata")
         assertTrue(preferences.weather().location?.name == "Amsterdam")
-        assertTrue(preferences.weather().preset == WeatherPreset.COMPACT)
+        assertTrue(preferences.weather().unit == TemperatureUnit.CELSIUS)
         assertTrue(preferences.appsExpanded())
         preferences.reset()
     }

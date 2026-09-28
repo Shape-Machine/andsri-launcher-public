@@ -127,11 +127,7 @@ class OpenMeteoClient {
         val location = requireNotNull(config.location)
         val resolvedUnit = resolveUnit(config.unit)
         val unitParameter = if (resolvedUnit == TemperatureUnit.FAHRENHEIT) "fahrenheit" else "celsius"
-        val forecastParameters = if (config.preset == WeatherPreset.FORECAST) {
-            "&hourly=temperature_2m,weather_code,precipitation_probability&forecast_hours=13&timezone=auto"
-        } else {
-            "&forecast_days=1"
-        }
+        val forecastParameters = "&hourly=temperature_2m,weather_code,precipitation_probability&forecast_hours=13&timezone=auto"
         val json = request(
             "https://api.open-meteo.com/v1/forecast" +
                 "?latitude=${location.latitude}&longitude=${location.longitude}" +

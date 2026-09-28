@@ -6,7 +6,6 @@ enum class DensityPreset { COMPACT, STANDARD, COMFORTABLE }
 enum class IconTheme { NORMAL, LAWNICONS, ARCTICONS, APPSTRACT, CUSCON, DELTA, DOLLPHONE, SNOW }
 enum class AppearanceMode { SYSTEM, LIGHT, DARK }
 enum class ClockPreset { COMPACT, STANDARD, EMPHASIZED }
-enum class WeatherPreset { COMPACT, STANDARD, EMPHASIZED, FORECAST }
 enum class TemperatureUnit { SYSTEM, CELSIUS, FAHRENHEIT }
 
 data class WeatherLocation(
@@ -20,7 +19,6 @@ data class AdditionalTimeZone(val locationName: String, val timeZoneId: String)
 
 data class WeatherConfig(
     val location: WeatherLocation? = null,
-    val preset: WeatherPreset = WeatherPreset.STANDARD,
     val unit: TemperatureUnit = TemperatureUnit.SYSTEM,
 )
 

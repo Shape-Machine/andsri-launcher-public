@@ -83,7 +83,7 @@ class MainActivity : Activity() {
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
         if (key == null || key == LauncherPreferences.KEY_WEATHER_NAME ||
             key == LauncherPreferences.KEY_WEATHER_LATITUDE || key == LauncherPreferences.KEY_WEATHER_LONGITUDE ||
-            key == LauncherPreferences.KEY_WEATHER_UNIT || key == LauncherPreferences.KEY_WEATHER_PRESET
+            key == LauncherPreferences.KEY_WEATHER_UNIT
         ) {
             weatherRequestGate.invalidate()
             weatherClient.cancel()
@@ -126,9 +126,6 @@ class MainActivity : Activity() {
             onAppLongClick = ::showAppMenu,
             onSettingsClick = { startActivity(Intent(this, SettingsActivity::class.java)) },
             onWeatherRefresh = ::refreshWeather,
-            onWeatherAttribution = {
-                startActivityIfResolvable(Intent(Intent.ACTION_VIEW, Uri.parse("https://open-meteo.com/")))
-            },
             onAppsToggle = preferences::setAppsExpanded,
         )
         listView = createAppList()
@@ -298,7 +295,7 @@ class MainActivity : Activity() {
             val result = runCatching { prepareReload(work) }
             mainExecutor.execute {
                 result.getOrNull()?.takeUnless { isDestroyed }?.let { update ->
-                    if (update.rows == null) adapter.updateAppearance(update.appearance, update.weather, update.textColor)
+                    if (update.rows == null) adapter.updateAppearance(update.appearance, update.textColor)
                     else adapter.submit(update.rows, update.appearance, update.weather, update.textColor)
                     adapter.updateWeather(update.weatherSnapshot, weatherRequestGate.isActive())
                     applyAppearance(update.appearance, update.textColor, update.wallpaper)

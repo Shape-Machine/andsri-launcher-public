@@ -118,9 +118,6 @@ class SettingsActivity : SettingsPageActivity() {
             action(R.string.hidden_apps, ::authenticateHiddenApps)
             section(R.string.weather)
             action(R.string.weather_location, ::editWeatherLocation, preferences.weather().location?.name)
-            enumControl(R.string.weather_style, WeatherPreset.entries, preferences.weather().preset) {
-                preferences.saveWeather(preferences.weather().copy(preset = it))
-            }
             enumControl(R.string.temperature_unit, TemperatureUnit.entries, preferences.weather().unit) {
                 weatherCache.clear()
                 preferences.saveWeather(preferences.weather().copy(unit = it))
@@ -503,10 +500,6 @@ class SettingsActivity : SettingsPageActivity() {
         ClockPreset.STANDARD -> R.string.option_standard
         ClockPreset.COMPACT -> R.string.option_compact
         ClockPreset.EMPHASIZED -> R.string.option_emphasized
-        WeatherPreset.COMPACT -> R.string.option_compact
-        WeatherPreset.STANDARD -> R.string.option_standard
-        WeatherPreset.EMPHASIZED -> R.string.option_emphasized
-        WeatherPreset.FORECAST -> R.string.option_forecast
         TemperatureUnit.SYSTEM -> R.string.option_system
         TemperatureUnit.CELSIUS -> R.string.option_celsius
         TemperatureUnit.FAHRENHEIT -> R.string.option_fahrenheit

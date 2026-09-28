@@ -43,7 +43,6 @@ class LauncherPreferences(context: Context) {
                 name.isNotBlank() && latitude.isFinite() && longitude.isFinite() && latitude in -90.0..90.0 && longitude in -180.0..180.0
             }
         },
-        preset = enumValue(KEY_WEATHER_PRESET, WeatherPreset.STANDARD),
         unit = enumValue(KEY_WEATHER_UNIT, TemperatureUnit.SYSTEM),
     )
 
@@ -70,7 +69,7 @@ class LauncherPreferences(context: Context) {
 
     fun saveWeather(value: WeatherConfig) {
         val editor = preferences.edit()
-            .putString(KEY_WEATHER_PRESET, value.preset.name)
+            .remove(KEY_LEGACY_WEATHER_PRESET)
             .putString(KEY_WEATHER_UNIT, value.unit.name)
         value.location?.let {
             editor.putString(KEY_WEATHER_NAME, it.name)
@@ -163,7 +162,7 @@ class LauncherPreferences(context: Context) {
         internal const val KEY_WEATHER_NAME = "weather_location_name"
         internal const val KEY_WEATHER_LATITUDE = "weather_location_latitude"
         internal const val KEY_WEATHER_LONGITUDE = "weather_location_longitude"
-        internal const val KEY_WEATHER_PRESET = "weather_preset"
+        private const val KEY_LEGACY_WEATHER_PRESET = "weather_preset"
         internal const val KEY_WEATHER_UNIT = "weather_unit"
         internal const val KEY_APPS_EXPANDED = "apps_expanded"
         private const val KEY_WALLPAPER = "wallpaper_uri"
